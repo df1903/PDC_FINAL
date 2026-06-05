@@ -1,0 +1,6 @@
+implementacion,T_s,speedup,eficiencia,AUC
+Python secuencial,,1.00,,
+Python multicore,,,,
+C + OpenMP,,,,
+C + MPI,,,,
+CUDA,,,,
