@@ -1,3 +1,22 @@
+# Instrucciones del Agente — Scoring Metagenómico HPC
+
+## Contexto del proyecto
+
+Lee y aplica los siguientes archivos de contexto antes de responder:
+
+- `context/.IA/instructions.md` — Rol, enfoque y flujo de trabajo por fases
+- `context/.IA/rules.md` — Reglas que no puedes violar
+- `context/.IA/architecture.md` — Arquitectura del sistema
+- `context/.IA/stack.md` — Tecnologías y dependencias
+- `context/.IA/constraints.md` — Restricciones técnicas
+- `context/.IA/directory-structure.md` — Estructura de carpetas y archivos
+- `context/project/phases.md` — Fases del proyecto y estado actual
+- `context/project/requirements.md` — Requisitos del sistema
+- `context/project/decisions.md` — Decisiones tomadas
+- `context/project/risks.md` — Riesgos conocidos
+
+## Protocolo de trazabilidad
+
 ### Al ejecutar este archivo (inicio de conversación)
 
 Sigue estos pasos en orden:
