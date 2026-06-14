@@ -1,21 +1,23 @@
 # Phases
 
-## Fase 1 — Python Baseline `[PLANIFICADA — lista para implementación]`
+## Fase 1 — Python Baseline `[COMPLETADA — 2026-06-14]`
 
 Objetivo: implementación de referencia correcta y validada según el modelo de perfiles (DEC-07), con CLI, medición de tiempo (excluyendo carga de datos) y registro automático en `results/benchmark.csv`.
 
 Plan técnico detallado y tareas concretas: ver `context/state/active-tasks.md`. Resumen ordenado:
 
-- [ ] **DEC-11**: actualizar `code/data/generate_data.py` para inyectar señal diferencial en las filas enfermas de `A` y regenerar `data/n_50/` y `data/n_100/` (`seed=42`).
-- [ ] Crear `code/python/common.py` con funciones compartidas entre `sequential.py` y `multicore.py`: `load_dataset`, `validate_dataset`, `sample_candidates`, `score_samples`, `evaluate_candidates`, `scoring_consistency`, `compute_metrics`, `append_benchmark`, `read_sequential_time`.
-- [ ] Reescribir `code/python/sequential.py`: `random_search(A, profiles, y, K=100_000, seed=42)`, CLI (`--n-items`, `--k-candidates`, `--seed`), timing con `perf_counter` (excluye carga), registro en benchmark.
-- [ ] Reescribir `code/python/multicore.py`: `random_search_multicore(A, profiles, y, K=100_000, seed=42, workers=cpu_count())`, candidatos generados en el proceso principal y repartidos con `np.array_split` + `multiprocessing.Pool`, CLI (`--n-items`, `--k-candidates`, `--workers`, `--seed`).
-- [ ] Migrar `code/results/benchmark.csv` al esquema: `implementation,n_items,k_candidates,workers,best_auc,time_seconds,candidates_per_second,speedup,efficiency` (append-only; crear si no existe; no sobrescribir filas previas).
-- [ ] Crear pruebas (`code/python/tests/test_baseline.py` o `code/tests/`): equivalencia AUC secuencial↔multicore (<1e-4, RF-04), AUC∈[0.5,1], consistencia≥0.8, caso chico N=3/K=100 (RIESGO-03).
-- [ ] Validar AUC ∈ [0.5, 1.0] y consistencia ≥ 0.8 con el dataset regenerado (DEC-11).
-- [ ] Medir T_secuencial como baseline para speedup (S_base = 1.00).
-- [ ] Ejecutar multicore y verificar speedup ≥ 1.5× (RNF-03); calcular `efficiency = speedup / workers`.
-- [ ] Registrar ambas filas en `results/benchmark.csv`.
+- [x] **DEC-11**: actualizar `code/data/generate_data.py` para inyectar señal diferencial en las filas enfermas de `A` y regenerar `data/n_50/` y `data/n_100/` (`seed=42`).
+- [x] Crear `code/python/common.py` con funciones compartidas entre `sequential.py` y `multicore.py`: `load_dataset`, `validate_dataset`, `sample_candidates`, `score_samples`, `evaluate_candidates`, `scoring_consistency`, `compute_metrics`, `append_benchmark`, `read_sequential_time`.
+- [x] Reescribir `code/python/sequential.py`: `random_search(A, profiles, y, K=100_000, seed=42)`, CLI (`--n-items`, `--k-candidates`, `--seed`), timing con `perf_counter` (excluye carga), registro en benchmark.
+- [x] Reescribir `code/python/multicore.py`: `random_search_multicore(A, profiles, y, K=100_000, seed=42, workers=cpu_count())`, candidatos generados en el proceso principal y repartidos con `np.array_split` + `multiprocessing.Pool`, CLI (`--n-items`, `--k-candidates`, `--workers`, `--seed`).
+- [x] Migrar `code/results/benchmark.csv` al esquema: `implementation,n_items,k_candidates,workers,best_auc,time_seconds,candidates_per_second,speedup,efficiency` (append-only; crear si no existe; no sobrescribir filas previas).
+- [x] Crear pruebas (`code/python/tests/test_baseline.py`): equivalencia AUC secuencial↔multicore (<1e-4, RF-04), AUC∈[0.5,1], consistencia≥0.8, caso chico N=3/K=100 (RIESGO-03). 5 tests, todos OK.
+- [x] Validar AUC ∈ [0.5, 1.0] y consistencia ≥ 0.8 con el dataset regenerado (DEC-11). Resultado: AUC=1.0000, consistencia=2.0000.
+- [x] Medir T_secuencial como baseline para speedup (S_base = 1.00). Resultado: 84.3913 s (K=100000, n_items=50).
+- [x] Ejecutar multicore y verificar speedup ≥ 1.5× (RNF-03); calcular `efficiency = speedup / workers`. Resultado: speedup=3.1698 (workers=4), efficiency=0.7924.
+- [x] Registrar ambas filas en `results/benchmark.csv`.
+
+Detalle completo de resultados: `context/state/current-phase.md` y `traceability_data/2026_06_14_17-18.md`.
 
 ## Fase 2 — C + OpenMP `[PENDIENTE]`
 

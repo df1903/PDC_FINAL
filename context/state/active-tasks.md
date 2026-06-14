@@ -1,15 +1,20 @@
 # Active Tasks — Fase 1 (Python Baseline)
 
+**Estado: COMPLETADA (2026-06-14)** — las 7 tareas se ejecutaron y validaron en el orden
+indicado. Resultados y criterios de salida: `context/state/current-phase.md` y
+`traceability_data/2026_06_14_17-18.md`. Este archivo se conserva como referencia histórica
+del plan de Fase 1; el plan de Fase 2 (C + OpenMP) está pendiente de definir aquí.
+
 Plan confirmado el 2026-06-14 (ver traceability `traceability_data/2026_06_14_16-42.md`). Ejecutar en este orden; cada tarea valida la anterior.
 
-## 1. DEC-11 — Señal diferencial en `generate_data.py`
+## 1. DEC-11 — Señal diferencial en `generate_data.py` ✅
 
 - Modificar `code/data/generate_data.py` (`generate_data` y, si aplica, `generate_profiles`) para que las filas enfermas (índices 5-9) de `A` correlacionen con ítems de `T`/`F` altos, de modo que exista un `W` en el simplex con AUC alto.
 - Mantener shapes/dtypes (DEC-10): `matrix_A.npy` (10,N) f32, `profiles.npy` (N,3) f32, `labels.npy` (10,) i32.
 - Regenerar (no reutilizar) `data/n_50/` y `data/n_100/` con `seed=42`. Documentar el cambio en el docstring del módulo.
 - Verificar manualmente tras regenerar: con algún `W` del simplex, `roc_auc_score(y, A @ (W1*T+W2*S+W3*F)) > 0.6` (si no, intensificar señal — RIESGO-04).
 
-## 2. Crear `code/python/common.py`
+## 2. Crear `code/python/common.py` ✅
 
 Módulo compartido entre `sequential.py` y `multicore.py` (máx. 200 LOC, type hints en firmas públicas). Importa los loaders de `code/data/generate_data.py`.
 
@@ -44,7 +49,7 @@ def read_sequential_time(csv_path, n_items: int, k_candidates: int) -> float | N
     # última fila "Python secuencial" que coincida en n_items/k_candidates
 ```
 
-## 3. Reescribir `code/python/sequential.py`
+## 3. Reescribir `code/python/sequential.py` ✅
 
 - `random_search(A, profiles, y, K=100_000, seed=42) -> tuple[np.ndarray, float]` usando `common.py`.
 - CLI (`argparse`): `--n-items` (50), `--k-candidates` (100000), `--seed` (42). (`--workers` se acepta pero se ignora o fuerza a 1, para CLI uniforme — confirmar si se incluye.)
@@ -54,7 +59,7 @@ def read_sequential_time(csv_path, n_items: int, k_candidates: int) -> float | N
 - `append_benchmark(...)` a `results/benchmark.csv`.
 - Imprimir `best_W`, `best_auc`, consistencia.
 
-## 4. Reescribir `code/python/multicore.py`
+## 4. Reescribir `code/python/multicore.py` ✅
 
 - `random_search_multicore(A, profiles, y, K=100_000, seed=42, workers=cpu_count()) -> tuple[np.ndarray, float]`.
 - Generar `candidates = sample_candidates(K, seed)` **una sola vez** en el proceso principal (determinismo independiente de `workers`).
@@ -64,21 +69,25 @@ def read_sequential_time(csv_path, n_items: int, k_candidates: int) -> float | N
 - `t_seq = read_sequential_time(csv, n_items, K)`; `speedup = t_seq/time_seconds` si existe, si no deja vacío y avisa por consola.
 - `efficiency = speedup / workers`. `append_benchmark(...)`.
 
-## 5. Migrar `code/results/benchmark.csv`
+## 5. Migrar `code/results/benchmark.csv` ✅
 
 - Esquema nuevo: `implementation,n_items,k_candidates,workers,best_auc,time_seconds,candidates_per_second,speedup,efficiency`.
 - El archivo actual tiene cabecera/filas antiguas (`implementacion,T_s,speedup,eficiencia,AUC`) que son plantilla, no resultados reales — se reemplaza la cabecera por la nueva (append-only desde ese punto en adelante).
 
-## 6. Pruebas (`pytest`)
+## 6. Pruebas (`pytest`) ✅
 
-- `code/python/tests/test_baseline.py` (o `code/tests/`):
+- `code/python/tests/test_baseline.py` (61 LOC, 5 tests, todos OK):
   - Dataset chico (`n_items=3`, `K=100`): AUC secuencial == AUC multicore (exacto, mismos candidatos).
   - `best_auc ∈ [0.5, 1.0]` para `n_items=50`.
   - `scoring_consistency(...) >= 0.8` para el `best_W` de `n_items=50`.
   - Validar `best_W.sum() ≈ 1` y `best_W >= 0`.
-- **Nota (ISSUE-007)**: no existe `code/pyproject.toml`. Verificar si `numpy`/`scikit-learn`/`pytest` están disponibles en el entorno antes de añadir tests; si falta `pyproject.toml`, crearlo declarando las dependencias ya usadas (no son "nuevas", solo había que declararlas — confirmar con el usuario antes de crear el archivo).
+- **ISSUE-007 (resuelto)**: `code/pyproject.toml` y `code/uv.lock` ya existían, con
+  `numpy`/`scikit-learn`/`matplotlib` + `pytest`/`ruff` (dev) declarados. No fue necesario
+  crearlos; solo se agregó `[tool.pytest.ini_options] pythonpath = ["python"]` para que
+  `test_baseline.py` importe `common`/`sequential`/`multicore` sin `sys.path` hacks (evita
+  E402 en `ruff`).
 
-## 7. Verificación final (desde `code/`)
+## 7. Verificación final (desde `code/`) ✅
 
 ```bash
 python data/generate_data.py
@@ -90,7 +99,10 @@ cat results/benchmark.csv
 ```
 
 Criterios de salida de Fase 1 (no avanzar a Fase 2 sin esto):
-- `best_auc ∈ [0.5, 1.0]` y consistencia ≥ 0.8 en ambas implementaciones.
-- `|auc_multicore - auc_secuencial| < 1e-4` (idealmente exacto).
-- `speedup_multicore ≥ 1.5×` (RNF-03). Si no se alcanza, documentar en `context/state/known-issues.md` y discutir mitigación (no bloquea necesariamente avanzar, pero debe quedar registrado).
-- `results/benchmark.csv` contiene ambas filas con el esquema nuevo, sin perder filas previas relevantes.
+- [x] `best_auc ∈ [0.5, 1.0]` y consistencia ≥ 0.8 en ambas implementaciones. (1.0000 / 2.0000 en ambas)
+- [x] `|auc_multicore - auc_secuencial| < 1e-4` (idealmente exacto). (0, exacto)
+- [x] `speedup_multicore ≥ 1.5×` (RNF-03). (3.1698×, workers=4)
+- [x] `results/benchmark.csv` contiene ambas filas con el esquema nuevo, sin perder filas previas relevantes.
+
+**Todos los criterios de salida de Fase 1 se cumplieron** (2026-06-14). Detalle completo:
+`context/state/current-phase.md`.

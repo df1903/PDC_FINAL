@@ -30,23 +30,23 @@
 
 ---
 
-## ISSUE-004 — `sequential.py` y `multicore.py` son placeholders no funcionales
+## ISSUE-004 — `sequential.py` y `multicore.py` eran placeholders no funcionales
 
 **Archivos**: `code/python/sequential.py`, `code/python/multicore.py`.
 
-**Descripción**: ambos cargan rutas planas antiguas (`../data/matrix_A.npy`, `../data/labels.npy`, no `data/n_{n_items}/`), no cargan `profiles.npy`, e implementan `P = A @ W[...]` / `A.mean(axis=1)` en vez del modelo DEC-07 (`P=W1*T+W2*S+W3*F`, `Score=A@P`). Sin CLI, sin timing, sin registro en benchmark.
+**Descripción**: ambos cargaban rutas planas antiguas (`../data/matrix_A.npy`, `../data/labels.npy`, no `data/n_{n_items}/`), no cargaban `profiles.npy`, e implementaban `P = A @ W[...]` / `A.mean(axis=1)` en vez del modelo DEC-07 (`P=W1*T+W2*S+W3*F`, `Score=A@P`). Sin CLI, sin timing, sin registro en benchmark.
 
-**Estado**: a resolver en Fase 1 (ver `context/state/active-tasks.md`, tareas 3-4).
+**Estado**: resuelto en Fase 1 (2026-06-14, tareas 3-4 de `context/state/active-tasks.md`). Reescritos con `common.py`, firmas canónicas, CLI, timing con `perf_counter` y registro en `results/benchmark.csv`.
 
 ---
 
-## ISSUE-005 — `generate_data.py` no inyecta señal diferencial (RIESGO-04)
+## ISSUE-005 — `generate_data.py` no inyectaba señal diferencial (RIESGO-04)
 
 **Archivo**: `code/data/generate_data.py`.
 
-**Descripción**: `A` es Dirichlet puro y los perfiles `T/S/F` son aleatorios sin correlación con `A` ni con `y`. `P` resulta común a todas las muestras y ningún `W` del simplex produce AUC > 0.5 ni consistencia ≥ 0.8.
+**Descripción**: `A` era Dirichlet puro y los perfiles `T/S/F` eran aleatorios sin correlación con `A` ni con `y`. `P` resultaba común a todas las muestras y ningún `W` del simplex producía AUC > 0.5 ni consistencia ≥ 0.8.
 
-**Estado**: resuelto vía DEC-11 — a implementar en Fase 1 (tarea 1 de `context/state/active-tasks.md`).
+**Estado**: resuelto en Fase 1 (2026-06-14, DEC-11, tarea 1 de `context/state/active-tasks.md`). Filas enfermas (5-9) de `A` ahora usan Dirichlet sesgada por `importance = T + F` (`SIGNAL_STRENGTH = 8.0`); `data/n_50/` y `data/n_100/` regenerados con `seed=42`. AUC resultante = 1.0000, consistencia = 2.0000.
 
 ---
 
@@ -54,16 +54,14 @@
 
 **Archivo**: `code/results/benchmark.csv`.
 
-**Descripción**: cabecera actual `implementacion,T_s,speedup,eficiencia,AUC` con filas plantilla (sin datos reales), distinta del esquema requerido por Fase 1: `implementation,n_items,k_candidates,workers,best_auc,time_seconds,candidates_per_second,speedup,efficiency`.
+**Descripción**: cabecera anterior `implementacion,T_s,speedup,eficiencia,AUC` con filas plantilla (sin datos reales), distinta del esquema requerido por Fase 1: `implementation,n_items,k_candidates,workers,best_auc,time_seconds,candidates_per_second,speedup,efficiency`.
 
-**Estado**: a migrar en Fase 1 (tarea 5 de `context/state/active-tasks.md`). No se pierden resultados reales (las filas actuales están vacías).
+**Estado**: resuelto en Fase 1 (2026-06-14, tarea 5 de `context/state/active-tasks.md`). Cabecera migrada al esquema nuevo (no se perdieron resultados reales, las filas anteriores eran plantilla vacía); ya contiene las filas reales de "Python secuencial" y "Python multicore".
 
 ---
 
-## ISSUE-007 — `code/pyproject.toml` no existe
+## ISSUE-007 — `code/pyproject.toml` no existía `[RESUELTO — ya existía]`
 
-**Descripción**: `context/.IA/stack.md` y `context/.IA/directory-structure.md` mencionan `code/pyproject.toml` y `code/uv.lock`, pero ninguno existe en el repo. `code/.env/` (probable venv) está vacío. `rules.md` exige declarar dependencias Python en `pyproject.toml`.
+**Descripción**: `context/.IA/stack.md` y `context/.IA/directory-structure.md` mencionaban `code/pyproject.toml` y `code/uv.lock` como inexistentes.
 
-**Impacto**: no está claro qué entorno/dependencias usa `python python/sequential.py` actualmente (numpy, scikit-learn ya se usan en el código existente sin estar declarados en ningún lado).
-
-**Estado**: a verificar al inicio de la implementación de Fase 1 (tarea 6 de `context/state/active-tasks.md`); si falta, crear `pyproject.toml` declarando numpy/scikit-learn/multiprocessing(stdlib)/pytest — confirmar con el usuario antes de crearlo.
+**Estado**: al verificar en Fase 1 (2026-06-14, tarea 6 de `context/state/active-tasks.md`) se encontró que `code/pyproject.toml` y `code/uv.lock` **ya existían**, con `numpy`/`scikit-learn`/`matplotlib` declarados y `pytest`/`ruff` como `dependency-groups.dev`; `code/.venv/` ya tenía estos paquetes instalados. No fue necesario crear nada; solo se agregó `[tool.pytest.ini_options] pythonpath = ["python"]` para los tests de `code/python/tests/test_baseline.py`.

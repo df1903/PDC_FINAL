@@ -1,6 +1,5 @@
-implementacion,T_s,speedup,eficiencia,AUC
-Python secuencial,,1.00,,
-Python multicore,,,,
-C + OpenMP,,,,
-C + MPI,,,,
-CUDA,,,,
+implementation,n_items,k_candidates,workers,best_auc,time_seconds,candidates_per_second,speedup,efficiency
+Python secuencial,50,100000,1,1.0,84.39132189998054,1184.9559616866609,1.0,1.0
+Python multicore,50,100000,4,1.0,26.623664299986558,3756.056975224499,3.1697861327083796,0.7924465331770949
+Python multicore,50,100000,4,1.0,23.993939800013322,4167.719050455586,3.517193199756785,0.8792982999391963
+Python secuencial,50,100000,1,1.0,80.97405759998946,1234.963431053417,1.0,1.0
