@@ -44,11 +44,12 @@ Nivel 3 — CUDA (notebook Google Colab)
 ## Flujo de datos
 
 ```
-generate_data.py
-  → matrix_A.npy  (10×N, float32)   matriz de contribución
-  → T.npy         (N,   float32)    perfil taxonómico
-  → S.npy         (N,   float32)    perfil socioeconómico
-  → F.npy         (N,   int32 ∈ {0,1,2})  perfil funcional
+generate_data.py  (guarda/carga en data/n_{n_items}/, ver DEC-10)
+  → matrix_A.npy  (10×N, float32)        matriz de contribución
+  → profiles.npy  (N, 3, float32)        perfiles por ítem:
+                                            columna 0 = T (taxonómico, float)
+                                            columna 1 = S (socioeconómico, float)
+                                            columna 2 = F (funcional, int ∈ {0,1,2})
   → labels.npy    (10,  int32)
 
 random_search(A, T, S, F, y, K=100_000, seed=42)

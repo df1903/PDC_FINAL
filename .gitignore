@@ -1,1 +1,68 @@
+# Temporary workspace
 temp/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments and local configuration
+.env
+.env.*
+!.env.example
+venv/
+.venv/
+env/
+
+# Generated data
+code/data/n_*/
+*.npy
+*.npz
+
+# Logs
+*.log
+.logs/
+code/.logs/
+
+# C / C++ / CUDA build outputs
+*.o
+*.obj
+*.out
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.exp
+*.ilk
+*.pdb
+*.ptx
+*.cubin
+*.fatbin
+
+# LaTeX build outputs
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+
+# Generated reports and plots
+code/report/*
+!code/report/.gitkeep
+code/results/plots/*
+!code/results/plots/.gitkeep

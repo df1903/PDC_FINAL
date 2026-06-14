@@ -4,18 +4,19 @@ Reglas que el agente NO puede violar sin confirmación explícita del usuario.
 
 ## Datos y reproducibilidad
 
-- Dataset estándar en `code/data/`:
+- Dataset estándar en `code/data/n_{n_items}/` (un subdirectorio por tamaño de problema, ver DEC-10):
   - `matrix_A.npy` — matriz de contribución, shape 10×N, float32.
-  - `T.npy` — perfil taxonómico, shape (N,), float32.
-  - `S.npy` — perfil socioeconómico, shape (N,), float32.
-  - `F.npy` — perfil funcional, shape (N,), int32 con valores en **{0, 1, 2}**.
+  - `profiles.npy` — perfiles por ítem, shape (N, 3), float32:
+    - columna 0 = `T` — perfil taxonómico, float en [0, 1].
+    - columna 1 = `S` — perfil socioeconómico, float en [0, 1].
+    - columna 2 = `F` — perfil funcional, entero en **{0, 1, 2}** (almacenado como float32).
   - `labels.npy` — etiquetas, shape (10,), int32.
 - `T`, `S`, `F` son perfiles **independientes por ítem**; no se derivan particionando columnas de `A`.
 - **Semilla fija: `seed=42`** en todas las implementaciones (Python, C, CUDA).
-- N_ITEMS por defecto: **50**. Modificar solo para pruebas de escalabilidad con autorización.
+- N_ITEMS por defecto: **50** (`data/n_50/`). Para otros tamaños, usar/crear `data/n_{n_items}/`.
 - K_CANDIDATES por defecto: **100 000** por búsqueda. Configurable vía argumento.
 - El vector W = (W₁, W₂, W₃) debe satisfacer el simplex 3D: W₁ + W₂ + W₃ = 1, Wᵢ ≥ 0 (independiente de N).
-- No modificar `matrix_A.npy`, `T.npy`, `S.npy`, `F.npy` ni `labels.npy` sin regenerar también todos los resultados de referencia.
+- No modificar `matrix_A.npy`, `profiles.npy` ni `labels.npy` sin regenerar también todos los resultados de referencia.
 
 ## Correctitud
 

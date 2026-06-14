@@ -6,12 +6,11 @@ Estructura verificada del repositorio `PDC_FINAL/`.
 PDC_FINAL/
 ├── code/                              # Todo el código del proyecto
 │   ├── data/
-│   │   ├── generate_data.py          # Genera matrix_A.npy, T/S/F.npy y labels.npy
-│   │   ├── matrix_A.npy              # A ∈ ℝ^{10×N}, float32 — matriz de contribución (seed=42)
-│   │   ├── T.npy                     # Perfil taxonómico, (N,) float32
-│   │   ├── S.npy                     # Perfil socioeconómico, (N,) float32
-│   │   ├── F.npy                     # Perfil funcional, (N,) int32 ∈ {0,1,2}
-│   │   └── labels.npy                # y ∈ {0,1}^{10}, int32
+│   │   ├── generate_data.py          # Genera/carga matrix_A.npy, profiles.npy y labels.npy por n_items
+│   │   └── n_{n_items}/               # Un subdirectorio por tamaño de problema (ej. n_50/, n_100/)
+│   │       ├── matrix_A.npy          # A ∈ ℝ^{10×N}, float32 — matriz de contribución (seed=42)
+│   │       ├── profiles.npy          # (N,3) float32 — columnas T, S, F (perfiles por ítem)
+│   │       └── labels.npy            # y ∈ {0,1}^{10}, int32
 │   ├── python/
 │   │   ├── sequential.py             # Nivel 1: Random Search secuencial
 │   │   └── multicore.py              # Nivel 1: Random Search multicore (Pool)
@@ -62,8 +61,8 @@ PDC_FINAL/
 
 ## Notas sobre rutas
 
-- Los datos (`matrix_A.npy`, `T.npy`, `S.npy`, `F.npy`, `labels.npy`) se generan desde `code/data/` y se leen con rutas relativas `../data/` desde los scripts de `python/`.
+- Los datos (`matrix_A.npy`, `profiles.npy`, `labels.npy`) se generan/cargan desde `code/data/n_{n_items}/` (vía `get_data_directory(n_items)`) y se leen con rutas relativas `../data/n_{n_items}/` desde los scripts de `python/`.
 - Los ejecutables C se generan en `code/C_OpenMP_MPI/` al correr `make`.
 - `run_all.sh` debe ejecutarse desde `code/` como directorio de trabajo (cubre los niveles CPU; la Fase 4 CUDA corre en Colab).
 - Para la Fase 4 hay que **subir los `.npy` de `code/data/` al runtime de Colab** antes de ejecutar `scoring_cuda.ipynb`.
-- Los archivos `.npy` **no se versionan** si son muy grandes; regenerarlos con `generate_data.py`.
+- Los archivos `.npy` **no se versionan** si son muy grandes; regenerarlos con `generate_data.py` (se generan únicamente los faltantes en `data/n_{n_items}/`).
