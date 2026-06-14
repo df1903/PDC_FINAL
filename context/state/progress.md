@@ -6,9 +6,11 @@
 - [x] `context/` documentado con el modelo de perfiles confirmado (T/S/F independientes, A matriz de contribución; ver `context/project/decisions.md`).
 - [x] Esqueletos de código presentes en `code/` (Python, C/OpenMP/MPI, CUDA) según `context/.IA/directory-structure.md`.
 
+## En progreso
+
+- [ ] Fase 1 (Python Baseline): plan técnico confirmado el 2026-06-14 (ver `context/state/active-tasks.md` y DEC-11 en `context/project/decisions.md`). Implementación aún no iniciada.
+
 ## Pendiente
 
-- [ ] Iniciar la implementación de la Fase 1 (Python Baseline) — ver `context/project/phases.md`.
+- [ ] Implementar la Fase 1 siguiendo `context/state/active-tasks.md`.
 - [ ] Fases 2 a 6 — pendientes, ver `context/project/phases.md`.
-
-El proyecto está en planificación general; no se ha decidido aún el arranque de ninguna fase.

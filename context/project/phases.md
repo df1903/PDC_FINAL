@@ -1,15 +1,21 @@
 # Phases
 
-## Fase 1 — Python Baseline `[PENDIENTE]`
+## Fase 1 — Python Baseline `[PLANIFICADA — lista para implementación]`
 
-Objetivo: implementación de referencia correcta y validada según el modelo de perfiles (DEC-07).
+Objetivo: implementación de referencia correcta y validada según el modelo de perfiles (DEC-07), con CLI, medición de tiempo (excluyendo carga de datos) y registro automático en `results/benchmark.csv`.
 
-- [ ] Regenerar datos con `generate_data.py`: `A (10×N)`, `T`, `S`, `F (∈{0,1,2})`, `y`, con señal diferencial.
-- [ ] Reimplementar `python/sequential.py` con `P = W₁T+W₂S+W₃F` y `Score = A·P` (carga T/S/F desde `.npy`).
-- [ ] Reimplementar `python/multicore.py` con el mismo modelo (Pool sobre candidatos W).
-- [ ] Validar AUC ∈ [0.5, 1.0] y consistencia ≥ 0.8.
-- [ ] Medir T_secuencial como baseline para speedup.
-- [ ] Registrar métricas en `results/benchmark.csv`.
+Plan técnico detallado y tareas concretas: ver `context/state/active-tasks.md`. Resumen ordenado:
+
+- [ ] **DEC-11**: actualizar `code/data/generate_data.py` para inyectar señal diferencial en las filas enfermas de `A` y regenerar `data/n_50/` y `data/n_100/` (`seed=42`).
+- [ ] Crear `code/python/common.py` con funciones compartidas entre `sequential.py` y `multicore.py`: `load_dataset`, `validate_dataset`, `sample_candidates`, `score_samples`, `evaluate_candidates`, `scoring_consistency`, `compute_metrics`, `append_benchmark`, `read_sequential_time`.
+- [ ] Reescribir `code/python/sequential.py`: `random_search(A, profiles, y, K=100_000, seed=42)`, CLI (`--n-items`, `--k-candidates`, `--seed`), timing con `perf_counter` (excluye carga), registro en benchmark.
+- [ ] Reescribir `code/python/multicore.py`: `random_search_multicore(A, profiles, y, K=100_000, seed=42, workers=cpu_count())`, candidatos generados en el proceso principal y repartidos con `np.array_split` + `multiprocessing.Pool`, CLI (`--n-items`, `--k-candidates`, `--workers`, `--seed`).
+- [ ] Migrar `code/results/benchmark.csv` al esquema: `implementation,n_items,k_candidates,workers,best_auc,time_seconds,candidates_per_second,speedup,efficiency` (append-only; crear si no existe; no sobrescribir filas previas).
+- [ ] Crear pruebas (`code/python/tests/test_baseline.py` o `code/tests/`): equivalencia AUC secuencial↔multicore (<1e-4, RF-04), AUC∈[0.5,1], consistencia≥0.8, caso chico N=3/K=100 (RIESGO-03).
+- [ ] Validar AUC ∈ [0.5, 1.0] y consistencia ≥ 0.8 con el dataset regenerado (DEC-11).
+- [ ] Medir T_secuencial como baseline para speedup (S_base = 1.00).
+- [ ] Ejecutar multicore y verificar speedup ≥ 1.5× (RNF-03); calcular `efficiency = speedup / workers`.
+- [ ] Registrar ambas filas en `results/benchmark.csv`.
 
 ## Fase 2 — C + OpenMP `[PENDIENTE]`
 

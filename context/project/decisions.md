@@ -72,3 +72,11 @@ Score = A · P                     (vector ℝ^{10})
 **Decisión**: la Fase 4 se desarrolla en `CUDA/scoring_cuda.ipynb`, ejecutado en un runtime GPU de Google Colab. El kernel CUDA C se materializa con `%%writefile` + `nvcc` y se orquesta con PyCUDA; `scoring_kernel.cu` y `scoring_pycuda.py` se conservan como fuentes derivadas.
 
 **Razón**: no se asume GPU local; Colab provee GPU y toolkit CUDA, simplificando la reproducibilidad de la medición de speedup en GPU.
+
+## DEC-11 — Señal diferencial en `generate_data.py` y regeneración de `data/n_{n_items}/` `[CONFIRMADO]`
+
+**Decisión**: como parte de la Fase 1, se autoriza modificar `code/data/generate_data.py` (`generate_data`, y si es necesario `generate_profiles`) para inyectar **señal diferencial** en las filas enfermas de `A` (correlación con ítems de alto `T`/`F`), tal como exigen RF-01, `constraints.md` y RIESGO-04. Como consecuencia, se regeneran los artefactos `.npy` existentes en `data/n_50/` y `data/n_100/` con `seed=42`.
+
+**Razón**: con el generador actual (`A` Dirichlet puro, perfiles `T/S` uniformes y `F` uniforme en {0,1,2} sin correlación con `A`), `P = W₁T+W₂S+W₃F` es común a todas las muestras y la separación entre grupos depende solo de cómo `A` pondera los ítems — pero `A` no tiene relación con la etiqueta, por lo que ningún `W` del simplex produce AUC > 0.5 ni consistencia ≥ 0.8 (ec. 4). La Fase 1 no puede validarse (RNF-02) sin esta señal.
+
+**Alcance**: no cambia la estructura de archivos definida en DEC-10 (`matrix_A.npy`, `profiles.npy`, `labels.npy` en `data/n_{n_items}/`, mismas shapes y dtypes) — solo cambian los **valores** generados. `load_or_generate*` deben regenerar (no reutilizar) los archivos afectados; documentar en el código qué cambió para que una regeneración futura sea reproducible con `seed=42`.

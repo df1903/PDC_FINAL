@@ -12,8 +12,11 @@ PDC_FINAL/
 │   │       ├── profiles.npy          # (N,3) float32 — columnas T, S, F (perfiles por ítem)
 │   │       └── labels.npy            # y ∈ {0,1}^{10}, int32
 │   ├── python/
+│   │   ├── common.py                 # Nivel 1: funciones compartidas (Fase 1, ver context/state/active-tasks.md)
 │   │   ├── sequential.py             # Nivel 1: Random Search secuencial
-│   │   └── multicore.py              # Nivel 1: Random Search multicore (Pool)
+│   │   ├── multicore.py              # Nivel 1: Random Search multicore (Pool)
+│   │   └── tests/
+│   │       └── test_baseline.py      # Equivalencia AUC, validaciones AUC/consistencia (Fase 1)
 │   ├── C_OpenMP_MPI/
 │   │   ├── scoring_openmp.c          # Nivel 2a: C + OpenMP
 │   │   ├── scoring_mpi.c             # Nivel 2b: C + MPI
@@ -66,3 +69,4 @@ PDC_FINAL/
 - `run_all.sh` debe ejecutarse desde `code/` como directorio de trabajo (cubre los niveles CPU; la Fase 4 CUDA corre en Colab).
 - Para la Fase 4 hay que **subir los `.npy` de `code/data/` al runtime de Colab** antes de ejecutar `scoring_cuda.ipynb`.
 - Los archivos `.npy` **no se versionan** si son muy grandes; regenerarlos con `generate_data.py` (se generan únicamente los faltantes en `data/n_{n_items}/`).
+- `pyproject.toml` / `uv.lock` aparecen en este listado como referencia de la convención de dependencias, pero **no existen aún** en el repo (ver `context/state/known-issues.md` ISSUE-007). Verificar/crear al implementar la Fase 1.

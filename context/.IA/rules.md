@@ -38,6 +38,17 @@ Reglas que el agente NO puede violar sin confirmación explícita del usuario.
 - Tiempo medido: desde inicio de la búsqueda hasta obtener W* (excluye carga de datos).
 - `results/benchmark.csv` es la fuente de verdad. No editar manualmente.
 - Speedup siempre calculado respecto a **Python secuencial** (S_base = 1.00).
+- Esquema de columnas (desde Fase 1, DEC-11 / `context/state/active-tasks.md`):
+  `implementation,n_items,k_candidates,workers,best_auc,time_seconds,candidates_per_second,speedup,efficiency`.
+  Append-only; no sobrescribir filas anteriores.
+
+## Firmas canónicas Fase 1 (Python)
+
+- `random_search(A, profiles, y, K=100_000, seed=42) -> tuple[np.ndarray, float]` en `sequential.py`.
+- `random_search_multicore(A, profiles, y, K=100_000, seed=42, workers=cpu_count()) -> tuple[np.ndarray, float]` en `multicore.py`.
+- `profiles` es el array `(N, 3)` de DEC-10 (`T=profiles[:,0]`, `S=profiles[:,1]`, `F=profiles[:,2]`).
+- Lógica compartida entre ambos scripts vive en `code/python/common.py` (ver `context/state/active-tasks.md`).
+- CLI obligatoria: `--n-items` (50), `--k-candidates` (100000), `--seed` (42); `multicore.py` además `--workers` (cpu_count()).
 
 ## Nomenclatura (no negociable)
 
