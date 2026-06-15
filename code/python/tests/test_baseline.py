@@ -6,7 +6,7 @@ Ejecutar desde `code/`:
 
 import numpy as np
 
-from common import load_dataset, score_samples, scoring_consistency
+from common import compute_metrics, load_dataset, score_samples, scoring_consistency
 from multicore import random_search_multicore
 from sequential import random_search
 
@@ -59,3 +59,30 @@ def test_best_w_en_simplex():
     best_W, _ = random_search(A, profiles, y, K=K_SMALL, seed=42)
     assert np.all(best_W >= 0)
     assert abs(float(best_W.sum()) - 1.0) < 1e-5
+
+
+def test_compute_metrics_speedup_respecto_a_propia_implementacion():
+    """speedup/efficiency usan el baseline P=1 de la MISMA implementación (DEC-13)."""
+    t_self_base = 0.0341
+    metrics = compute_metrics(
+        K=100_000, time_s=0.0082, workers=4, t_self_base=t_self_base, t_python_seq=80.0
+    )
+    assert metrics["speedup"] == t_self_base / 0.0082
+    assert abs(metrics["speedup"] - 4.1585) < 1e-3
+    assert metrics["efficiency"] == metrics["speedup"] / 4
+    assert metrics["speedup_vs_python"] == 80.0 / 0.0082
+
+
+def test_compute_metrics_speedup_propio_es_uno_en_p1():
+    """Con `time_s == t_self_base` (P=1 de la propia implementación), speedup=1."""
+    metrics = compute_metrics(K=1000, time_s=0.05, workers=1, t_self_base=0.05, t_python_seq=0.05)
+    assert metrics["speedup"] == 1.0
+    assert metrics["efficiency"] == 1.0
+    assert metrics["speedup_vs_python"] == 1.0
+
+
+def test_compute_metrics_sin_baseline_deja_speedup_vacio():
+    metrics = compute_metrics(K=1000, time_s=0.05, workers=2)
+    assert metrics["speedup"] is None
+    assert metrics["efficiency"] is None
+    assert metrics["speedup_vs_python"] is None

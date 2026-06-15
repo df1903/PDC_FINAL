@@ -2,8 +2,8 @@
 
 Carga/validación de datos, muestreo de candidatos W sobre el simplex,
 cálculo de Score/AUC/consistencia (ecs. 1-4 de `others/proyecto_final.md`)
-y registro de métricas en `results/benchmark.csv` (esquema de 9 columnas,
-ver `context/.IA/rules.md`).
+y registro de métricas en `results/benchmark.csv` (esquema de 10 columnas,
+ver `context/.IA/rules.md` y DEC-13).
 """
 
 import csv
@@ -32,6 +32,7 @@ BENCHMARK_COLUMNS = [
     "candidates_per_second",
     "speedup",
     "efficiency",
+    "speedup_vs_python",
 ]
 
 
@@ -97,16 +98,25 @@ def scoring_consistency(y: np.ndarray, scores: np.ndarray, theta: float | None =
     return float(true_positive / 5 + true_negative / 5)
 
 
-def compute_metrics(K: int, time_s: float, workers: int, t_seq: float | None = None) -> dict:
-    """Calcula candidates_per_second y, si `t_seq` está disponible, speedup/efficiency."""
+def compute_metrics(
+    K: int,
+    time_s: float,
+    workers: int,
+    t_self_base: float | None = None,
+    t_python_seq: float | None = None,
+) -> dict:
+    """Calcula `candidates_per_second` y, si están disponibles, `speedup`/`efficiency`
+    (respecto a P=1 de la MISMA implementación, `t_self_base`) y `speedup_vs_python`
+    (respecto a "Python secuencial", `t_python_seq`), ver DEC-13."""
     metrics: dict = {"candidates_per_second": K / time_s}
-    if t_seq is not None:
-        speedup = t_seq / time_s
+    if t_self_base is not None:
+        speedup = t_self_base / time_s
         metrics["speedup"] = speedup
         metrics["efficiency"] = speedup / workers
     else:
         metrics["speedup"] = None
         metrics["efficiency"] = None
+    metrics["speedup_vs_python"] = t_python_seq / time_s if t_python_seq is not None else None
     return metrics
 
 

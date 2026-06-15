@@ -1,11 +1,14 @@
 # Active Tasks — Fase 2 (C + OpenMP)
 
-**Estado: PLANIFICADA — pendiente de implementar** (plan confirmado 2026-06-15, ver
-`traceability_data/2026_06_15_14-24.md`). Fase activa según `context/state/current-phase.md`.
+**Estado: COMPLETADA — 2026-06-15** (plan confirmado 2026-06-15 en
+`traceability_data/2026_06_15_14-24.md`, implementado y validado en
+`traceability_data/2026_06_15_14-36.md`). Resultados reales en
+`context/state/current-phase.md`. Fase activa: Fase 3 (C + MPI).
 
 > Fase 1 (Python Baseline) **COMPLETADA** (2026-06-14). Su plan histórico está en
 > `traceability_data/2026_06_14_16-42.md` y los resultados en
-> `context/state/current-phase.md`. Este archivo pasa a contener el plan activo de Fase 2.
+> `context/state/current-phase.md`. Este archivo conserva el plan ya ejecutado de Fase 2
+> como referencia para Fase 3 (reutiliza `npy_io.{h,c}`).
 
 Objetivo: implementar `code/C_OpenMP_MPI/scoring_openmp.c` (Random Search con paralelismo de
 memoria compartida) **equivalente a la Fase 1** (AUC, esquema de benchmark, CLI análoga),
@@ -114,28 +117,44 @@ Estructura (separar cómputo de `main`, `#define` para constantes, sin VLAs — 
 
 ## 8. Registro en `results/benchmark.csv` (esquema de 9 columnas, append-only)
 
-| columna | valor en C |
+> **Superado por DEC-13 (2026-06-15)**: el esquema pasó de 9 a 10 columnas
+> (`+ speedup_vs_python`) y las fórmulas de `speedup`/`efficiency` cambiaron. Tabla y fórmulas
+> originales (plan de Fase 2) conservadas abajo como referencia histórica; ver
+> `context/project/decisions.md#DEC-13` y `context/.IA/rules.md` para las fórmulas vigentes.
+
+| columna | valor en C (plan original, ver nota DEC-13) |
 |---|---|
 | `implementation` | `C OpenMP` (estilo "Python multicore", DEC-12) |
 | `n_items`, `k_candidates`, `workers` | de CLI (`workers` = `threads`) |
 | `best_auc`, `time_seconds` | del run (tiempo solo de búsqueda) |
 | `candidates_per_second` | `K / time_seconds` |
-| `speedup` | `t_seq / time_seconds` |
+| `speedup` | `t_seq / time_seconds` (Python secuencial — **descartado por DEC-13**) |
 | `efficiency` | `speedup / threads` |
 
 - `t_seq`: leer en C la última fila `Python secuencial` que coincida en `n_items` y
   `k_candidates` (mini-lector CSV, espejo de `read_sequential_time`). Si no existe → advertir y
   dejar `speedup`/`efficiency` vacíos (como `multicore.py`).
 - Append-only: crear cabecera solo si el archivo falta/está vacío; **no** sobrescribir filas.
+- **Vigente (DEC-13)**: `speedup = T_openmp(workers=1) / T_openmp(workers)`,
+  `efficiency = speedup / workers`, y nueva columna `speedup_vs_python = T_python_secuencial /
+  T_openmp(workers)` (vía `read_last_time`, generalización de `read_sequential_time`).
 
 ## 9. Criterios de salida de Fase 2 (no avanzar a Fase 3 sin esto)
 
-- [ ] `--self-test` de AUC en verde, incluido el caso con empate (RIESGO-03).
-- [ ] `|best_auc_C − best_auc_PySeq| < 1e-4` (mismo K=100k, seed=42, N=50).
-- [ ] `best_auc ∈ [0.5, 1.0]` (se espera 1.0) y consistencia (ec. 4) ≥ 0.8.
-- [ ] `speedup ≥ 3×` con **P=4** (RNF-03); reportar curva P ∈ {1,2,4,8}.
-- [ ] Filas `C OpenMP` añadidas a `results/benchmark.csv` sin perder filas previas.
-- [ ] Sin fugas (`valgrind --leak-check=full`).
+- [x] `--self-test` de AUC en verde, incluido el caso con empate (RIESGO-03). 3/3 OK
+      (`scores=[1,2,2,3]`/`y=[0,0,1,1]` → AUC=0.875, igual a sklearn).
+- [x] `|best_auc_C − best_auc_PySeq| < 1e-4` (mismo K=100k, seed=42, N=50). `1.0000 vs 1.0000`,
+      `|ΔAUC|=0`.
+- [x] `best_auc ∈ [0.5, 1.0]` (se espera 1.0) y consistencia (ec. 4) ≥ 0.8. `best_auc=1.0000`,
+      consistencia=2.0000.
+- [x] `speedup ≥ 3×` con **P=4** (RNF-03); reportar curva P ∈ {1,2,4,8}. Valores originales
+      (P=1→2386.10×, ..., P=8→14813.67×) eran `speedup_vs_python`, no speedup paralelo —
+      corregido por DEC-13 (2026-06-15): `speedup(P=4)=3.84× ≥ 3×`; curva:
+      P=1→1.00×, P=2→2.04×, P=4→3.84×, P=8→5.40× (ver `context/state/current-phase.md`).
+- [x] Filas `C OpenMP` añadidas a `results/benchmark.csv` sin perder filas previas. 4 filas
+      (P∈{1,2,4,8}) añadidas; filas de Fase 1 intactas.
+- [x] Sin fugas (`valgrind --leak-check=full`). `definitely lost: 0 bytes`,
+      `indirectly lost: 0 bytes` (resto: internos de `libgomp`).
 
 ## 10. Entorno y comandos
 

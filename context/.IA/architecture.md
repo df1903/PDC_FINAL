@@ -108,9 +108,14 @@ vía PyCUDA dentro de `CUDA/scoring_cuda.ipynb`, ejecutado en un runtime con GPU
 
 ## Métricas de evaluación
 
+`speedup`/`efficiency` se calculan respecto al **baseline P=1 de la misma implementación**
+(speedup paralelo clásico, DEC-13); la comparación contra Python secuencial vive en una
+columna separada (`speedup_vs_python`).
+
 | Métrica | Fórmula |
 |---------|---------|
 | Tiempo T | t_fin − t_inicio (excluye carga de datos) |
-| Speedup S | T_Python_seq / T_impl |
-| Eficiencia E | S / P  (P = núcleos/hilos) |
+| Speedup S(P) | T_impl(P=1) / T_impl(P) |
+| Eficiencia E | S(P) / P  (P = núcleos/hilos/procesos) |
+| Speedup vs Python | T_Python_secuencial / T_impl(P) (columna `speedup_vs_python`) |
 | Speedup máx. Amdahl | 1 / ((1−f) + f/P) |

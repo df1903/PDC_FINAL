@@ -94,3 +94,37 @@ Score = A · P                     (vector ℝ^{10})
 **Razón**: mantener equivalencia con la Fase 1 validada sin añadir dependencias ni tocar los datos, dejando explícito qué es reproducible bit a bit (no el stream de candidatos) y qué se valida realmente (el valor de AUC).
 
 **Interpretación descartada**: exportar CSV/binarios adicionales desde Python para C (añade artefactos y toca `data/`); intentar replicar PCG64 + el algoritmo gamma de NumPy en C (inviable y no exigido); contar AUC solo con pares estrictos sin acreditar empates (diverge de sklearn).
+
+## DEC-13 — Redefinición de `speedup`/`efficiency` y nueva columna `speedup_vs_python` `[CONFIRMADO — 2026-06-15]`
+
+**Decisión**: corregir el cálculo de `speedup`/`efficiency` en `results/benchmark.csv` para que
+representen **speedup paralelo** (respecto al baseline P=1 de la MISMA implementación), no la
+diferencia de rendimiento entre lenguajes/implementaciones:
+
+- `speedup(P) = T_impl(P=1) / T_impl(P)`, `efficiency = speedup / workers`.
+- "Python secuencial" es el baseline P=1 de la familia Python: `speedup_python_multicore =
+  T_python_secuencial / T_python_multicore` (sin cambios respecto a DEC-11, ya era correcto).
+- "C OpenMP" (y "C MPI" en Fase 3) usan como baseline P=1 su propia fila `workers=1` en
+  `benchmark.csv` (`speedup_openmp(P) = T_openmp(1) / T_openmp(P)`).
+- Se agrega la columna `speedup_vs_python = T_python_secuencial / T_impl(P)` para la
+  comparación explícita entre implementaciones (lo que antes ocupaba indebidamente la columna
+  `speedup` para "C OpenMP"). Esquema de `benchmark.csv` pasa de 9 a **10 columnas**:
+  `..., candidates_per_second, speedup, efficiency, speedup_vs_python`.
+- `common.py: compute_metrics(K, time_s, workers, t_self_base=None, t_python_seq=None)`
+  reemplaza el parámetro `t_seq` único; `scoring_openmp.c` lee su propio baseline P=1 vía
+  `read_last_time(csv, "C OpenMP", n_items, k_candidates, required_workers=1, ...)` (función que
+  generaliza/reemplaza `read_sequential_time`).
+
+**Razón**: el cálculo previo (`speedup = T_python_secuencial / T_impl`, ver DEC-11/`rules.md`
+anterior) producía valores de miles para "C OpenMP" (p.ej. `speedup(P=8)=14813×`) que mezclan
+dos efectos distintos — la diferencia de rendimiento C vs Python/NumPy/sklearn (órdenes de
+magnitud) y el speedup por paralelización OpenMP (sublineal, esperado para N=50) — haciendo que
+`efficiency = speedup/threads` no fuera interpretable como eficiencia de paralelización clásica
+(podía superar 1.0 por miles). Separar ambas métricas permite leer `speedup`/`efficiency` como
+en cualquier análisis de Amdahl (Fase 6) y conservar la comparación entre lenguajes en
+`speedup_vs_python` sin perderla.
+
+**Interpretación descartada**: mantener `speedup` como comparación contra Python secuencial
+para todas las implementaciones (DEC-11/`rules.md` previos a esta decisión) — válido para
+Python multicore (su baseline P=1 ya es Python secuencial) pero no generalizable a C/CUDA, cuyo
+baseline P=1 es su propia versión de un hilo/proceso.

@@ -75,7 +75,15 @@ def main() -> None:
             "[WARN] No se encontró una fila 'Python secuencial' en benchmark.csv "
             "para este n_items/k_candidates; speedup/efficiency quedarán vacíos."
         )
-    metrics = compute_metrics(args.k_candidates, time_seconds, workers=args.workers, t_seq=t_seq)
+    # "Python secuencial" es el baseline P=1 de la familia Python (DEC-13): t_self_base
+    # y t_python_seq coinciden para esta implementación.
+    metrics = compute_metrics(
+        args.k_candidates,
+        time_seconds,
+        workers=args.workers,
+        t_self_base=t_seq,
+        t_python_seq=t_seq,
+    )
 
     append_benchmark(
         {
@@ -88,6 +96,7 @@ def main() -> None:
             "candidates_per_second": metrics["candidates_per_second"],
             "speedup": metrics["speedup"],
             "efficiency": metrics["efficiency"],
+            "speedup_vs_python": metrics["speedup_vs_python"],
         },
         BENCHMARK_CSV,
     )

@@ -47,7 +47,13 @@ def main() -> None:
     time_seconds = time.perf_counter() - start
 
     consistency = scoring_consistency(y, score_samples(A, profiles, best_W))
-    metrics = compute_metrics(args.k_candidates, time_seconds, workers=1, t_seq=time_seconds)
+    metrics = compute_metrics(
+        args.k_candidates,
+        time_seconds,
+        workers=1,
+        t_self_base=time_seconds,
+        t_python_seq=time_seconds,
+    )
 
     append_benchmark(
         {
@@ -60,6 +66,7 @@ def main() -> None:
             "candidates_per_second": metrics["candidates_per_second"],
             "speedup": metrics["speedup"],
             "efficiency": metrics["efficiency"],
+            "speedup_vs_python": metrics["speedup_vs_python"],
         },
         BENCHMARK_CSV,
     )

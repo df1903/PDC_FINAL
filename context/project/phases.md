@@ -19,23 +19,31 @@ Plan técnico detallado y tareas concretas: ver `context/state/active-tasks.md`.
 
 Detalle completo de resultados: `context/state/current-phase.md` y `traceability_data/2026_06_14_17-18.md`.
 
-## Fase 2 — C + OpenMP `[PLANIFICADA — pendiente de implementar]`
+## Fase 2 — C + OpenMP `[COMPLETADA — 2026-06-15]`
 
 Objetivo: paralelismo de memoria compartida sobre CPU.
 
 Plan técnico detallado y tareas concretas: ver `context/state/active-tasks.md` (definido
 2026-06-15, `traceability_data/2026_06_15_14-24.md`). Resumen ordenado:
 
-- [ ] Crear `code/C_OpenMP_MPI/npy_io.{h,c}`: parser `.npy` v1.0 mínimo (sin libs externas,
+- [x] Crear `code/C_OpenMP_MPI/npy_io.{h,c}`: parser `.npy` v1.0 mínimo (sin libs externas,
       DEC-06), solo lectura de `matrix_A.npy`/`profiles.npy`/`labels.npy` (DEC-10).
-- [ ] Implementar carga + validación de datos en `scoring_openmp.c` (espejo de `validate_dataset`).
-- [ ] RNG SplitMix64 por candidato (`seed+k`) → Dirichlet(1,1,1) reproducible y thread-safe.
-- [ ] Score `A·P` y **AUC con manejo de empates** (`+0.5·empates`, RIESGO-03/ISSUE-008).
-- [ ] Random Search con OpenMP (best local por hilo + `#pragma omp critical`).
-- [ ] CLI (`--n-items/--k-candidates/--seed/--threads/--self-test`) y registro `C OpenMP` en
+- [x] Implementar carga + validación de datos en `scoring_openmp.c` (espejo de `validate_dataset`).
+- [x] RNG SplitMix64 por candidato (`seed+k`) → Dirichlet(1,1,1) reproducible y thread-safe.
+- [x] Score `A·P` y **AUC con manejo de empates** (`+0.5·empates`, RIESGO-03/ISSUE-008).
+- [x] Random Search con OpenMP (best local por hilo + `#pragma omp critical`).
+- [x] CLI (`--n-items/--k-candidates/--seed/--threads/--self-test`) y registro `C OpenMP` en
       `results/benchmark.csv` (9 columnas, append-only).
-- [ ] Validar equivalencia AUC con Fase 1 (`--self-test` + `|ΔAUC| < 1e-4` vs Python secuencial).
-- [ ] Medir speedup vs Python secuencial con P ∈ {1, 2, 4, 8} (objetivo `≥ 3×` con P=4).
+- [x] Validar equivalencia AUC con Fase 1 (`--self-test` + `|ΔAUC| < 1e-4` vs Python secuencial).
+- [x] Medir speedup vs Python secuencial con P ∈ {1, 2, 4, 8} (objetivo `≥ 3×` con P=4).
+
+Resultados (seed=42, n_items=50, K=100000, desde `code/`): `best_auc=1.0000` (=Python
+secuencial, `|ΔAUC|=0`), consistencia=2.0000. Speedup vs Python secuencial: P=1 → 2386.10×,
+P=2 → 5555.14×, P=4 → 10411.83× (≥3× ✓), P=8 → 14813.67×. `--self-test` de `compute_auc` OK
+(3/3, incluido caso con empate=0.875). `valgrind --leak-check=full`: 0 bytes definitely/indirectly
+lost (solo "possibly lost"/"still reachable" internos de `libgomp`, no atribuibles al código
+propio). Detalle completo: `context/state/current-phase.md` y
+`traceability_data/2026_06_15_14-36.md`.
 
 ## Fase 3 — C + MPI `[PENDIENTE]`
 

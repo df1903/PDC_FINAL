@@ -1,13 +1,19 @@
 CC      = gcc
 MPICC   = mpicc
-CFLAGS  = -O2 -Wall
+CFLAGS  = -O2 -Wall -Wextra
 OMP_FLAGS = -fopenmp
 MPI_FLAGS =
 
+.PHONY: all openmp mpi clean
+
 all: scoring_openmp scoring_mpi
 
-scoring_openmp: scoring_openmp.c
-	$(CC) $(CFLAGS) $(OMP_FLAGS) -o scoring_openmp scoring_openmp.c -lm
+openmp: scoring_openmp
+
+mpi: scoring_mpi
+
+scoring_openmp: scoring_openmp.c npy_io.c npy_io.h
+	$(CC) $(CFLAGS) $(OMP_FLAGS) -o scoring_openmp scoring_openmp.c npy_io.c -lm
 
 scoring_mpi: scoring_mpi.c
 	$(MPICC) $(CFLAGS) -o scoring_mpi scoring_mpi.c -lm

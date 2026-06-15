@@ -37,9 +37,17 @@ Reglas que el agente NO puede violar sin confirmación explícita del usuario.
 
 - Tiempo medido: desde inicio de la búsqueda hasta obtener W* (excluye carga de datos).
 - `results/benchmark.csv` es la fuente de verdad. No editar manualmente.
-- Speedup siempre calculado respecto a **Python secuencial** (S_base = 1.00).
-- Esquema de columnas (desde Fase 1, DEC-11 / `context/state/active-tasks.md`):
-  `implementation,n_items,k_candidates,workers,best_auc,time_seconds,candidates_per_second,speedup,efficiency`.
+- **Speedup/efficiency (DEC-13)**: `speedup` se calcula siempre respecto al **baseline P=1 de
+  la MISMA implementación** (`speedup(P) = T_impl(P=1) / T_impl(P)`), y
+  `efficiency = speedup / workers`. Para "Python secuencial" y "Python multicore", el baseline
+  P=1 es "Python secuencial" (`speedup_python_multicore = T_python_secuencial /
+  T_python_multicore`). Para "C OpenMP"/"C MPI", el baseline P=1 es la fila de esa MISMA
+  implementación con `workers=1` (`speedup_openmp(P) = T_openmp(1) / T_openmp(P)`).
+- **Comparación entre implementaciones**: cualquier comparación contra "Python secuencial"
+  (p.ej. C vs Python) va en la columna separada `speedup_vs_python =
+  T_python_secuencial / T_impl`; **nunca** se reutiliza la columna `speedup` para esto.
+- Esquema de columnas (DEC-13, reemplaza el esquema de 9 columnas de DEC-11):
+  `implementation,n_items,k_candidates,workers,best_auc,time_seconds,candidates_per_second,speedup,efficiency,speedup_vs_python`.
   Append-only; no sobrescribir filas anteriores.
 
 ## Firmas canónicas Fase 1 (Python)

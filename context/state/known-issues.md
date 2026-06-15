@@ -10,13 +10,13 @@
 
 ---
 
-## ISSUE-002 — Carga de datos no implementada en scoring_openmp.c
+## ISSUE-002 — Carga de datos no implementada en scoring_openmp.c `[RESUELTO — 2026-06-15]`
 
 **Archivo**: `code/C_OpenMP_MPI/scoring_openmp.c` línea 29
 
 **Descripción**: el `main()` imprime un placeholder y retorna sin cargar datos ni ejecutar la búsqueda.
 
-**Estado**: pendiente (Fase 2). **Plan definido** (2026-06-15) en `context/state/active-tasks.md`: carga vía parser `.npy` mínimo (`npy_io.{h,c}`, sin libs externas), Random Search OpenMP y registro en `benchmark.csv`.
+**Estado**: resuelto en Fase 2 (2026-06-15, `context/state/active-tasks.md`). Implementados `code/C_OpenMP_MPI/npy_io.{h,c}` (parser `.npy` v1.0 propio, sin libs externas) y `load_dataset`/`free_dataset` en `scoring_openmp.c` (espejo de `validate_dataset`), Random Search OpenMP completo y registro en `results/benchmark.csv`. Detalle: `traceability_data/2026_06_15_14-36.md`.
 
 ---
 
@@ -68,10 +68,30 @@
 
 ---
 
-## ISSUE-008 — `compute_auc` del placeholder C no acredita empates (RIESGO-03)
+## ISSUE-009 — `speedup`/`efficiency` de "C OpenMP" comparaban contra Python, no paralelismo `[RESUELTO — 2026-06-15]`
+
+**Archivo**: `code/results/benchmark.csv`, `code/python/common.py`, `code/C_OpenMP_MPI/scoring_openmp.c`.
+
+**Descripción**: el esquema de Fase 2 (DEC-12, ISSUE-008) calculaba `speedup_openmp =
+T_python_secuencial / T_openmp` para todas las filas "C OpenMP", produciendo valores de miles
+(2386×–14813×) que mezclan la diferencia de rendimiento C vs Python con el speedup paralelo de
+OpenMP; `efficiency = speedup/threads` resultante (1851×–2777×) no era interpretable como
+eficiencia de paralelización clásica.
+
+**Estado**: resuelto (2026-06-15, DEC-13, `traceability_data/2026_06_15_15-24.md`). `speedup`/
+`efficiency` ahora son relativos al baseline propio `workers=1` de cada implementación
+(`speedup_openmp(P)=T_openmp(1)/T_openmp(P)`); la comparación contra Python vive en la nueva
+columna `speedup_vs_python`. Esquema de `benchmark.csv` 9→10 columnas; `compute_metrics` en
+`common.py` y `read_last_time`/`append_benchmark` en `scoring_openmp.c` actualizados; 3 tests
+nuevos en `test_baseline.py` (8/8 OK); `benchmark.csv` regenerado: `speedup(P=1..8) = 1.00,
+2.04, 3.84, 5.40`.
+
+---
+
+## ISSUE-008 — `compute_auc` del placeholder C no acredita empates (RIESGO-03) `[RESUELTO — 2026-06-15]`
 
 **Archivo**: `code/C_OpenMP_MPI/scoring_openmp.c` líneas 13-26.
 
 **Descripción**: el `compute_auc` del placeholder solo cuenta pares estrictos (`scores[i] > scores[j]`) y **no acredita los empates**, mientras que `sklearn.roc_auc_score` (usado por la Fase 1) otorga **0.5 por empate**. En datasets con scores empatados esto produce divergencia de AUC entre C y Python (RIESGO-03).
 
-**Estado**: pendiente (Fase 2). **Plan definido** (2026-06-15, tarea 4 de `context/state/active-tasks.md`): corregir a `AUC = (concordantes + 0.5·empates) / (pos·neg)` y validar con `--self-test` (incluido un caso con empate) contra valores conocidos de sklearn antes de escalar.
+**Estado**: resuelto en Fase 2 (2026-06-15, tarea 4 de `context/state/active-tasks.md`). `compute_auc` ahora calcula `AUC = (concordantes + 0.5·empates) / (pos·neg)`; validado con `--self-test` (3 casos, incluido `scores=[1,2,2,3]`/`y=[0,0,1,1]` → AUC=0.875, igual a `sklearn.roc_auc_score`). Detalle: `traceability_data/2026_06_15_14-36.md`.
