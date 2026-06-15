@@ -16,7 +16,7 @@
 
 **Descripción**: el `main()` imprime un placeholder y retorna sin cargar datos ni ejecutar la búsqueda.
 
-**Estado**: pendiente (Fase 2).
+**Estado**: pendiente (Fase 2). **Plan definido** (2026-06-15) en `context/state/active-tasks.md`: carga vía parser `.npy` mínimo (`npy_io.{h,c}`, sin libs externas), Random Search OpenMP y registro en `benchmark.csv`.
 
 ---
 
@@ -65,3 +65,13 @@
 **Descripción**: `context/.IA/stack.md` y `context/.IA/directory-structure.md` mencionaban `code/pyproject.toml` y `code/uv.lock` como inexistentes.
 
 **Estado**: al verificar en Fase 1 (2026-06-14, tarea 6 de `context/state/active-tasks.md`) se encontró que `code/pyproject.toml` y `code/uv.lock` **ya existían**, con `numpy`/`scikit-learn`/`matplotlib` declarados y `pytest`/`ruff` como `dependency-groups.dev`; `code/.venv/` ya tenía estos paquetes instalados. No fue necesario crear nada; solo se agregó `[tool.pytest.ini_options] pythonpath = ["python"]` para los tests de `code/python/tests/test_baseline.py`.
+
+---
+
+## ISSUE-008 — `compute_auc` del placeholder C no acredita empates (RIESGO-03)
+
+**Archivo**: `code/C_OpenMP_MPI/scoring_openmp.c` líneas 13-26.
+
+**Descripción**: el `compute_auc` del placeholder solo cuenta pares estrictos (`scores[i] > scores[j]`) y **no acredita los empates**, mientras que `sklearn.roc_auc_score` (usado por la Fase 1) otorga **0.5 por empate**. En datasets con scores empatados esto produce divergencia de AUC entre C y Python (RIESGO-03).
+
+**Estado**: pendiente (Fase 2). **Plan definido** (2026-06-15, tarea 4 de `context/state/active-tasks.md`): corregir a `AUC = (concordantes + 0.5·empates) / (pos·neg)` y validar con `--self-test` (incluido un caso con empate) contra valores conocidos de sklearn antes de escalar.

@@ -19,14 +19,23 @@ Plan técnico detallado y tareas concretas: ver `context/state/active-tasks.md`.
 
 Detalle completo de resultados: `context/state/current-phase.md` y `traceability_data/2026_06_14_17-18.md`.
 
-## Fase 2 — C + OpenMP `[PENDIENTE]`
+## Fase 2 — C + OpenMP `[PLANIFICADA — pendiente de implementar]`
 
 Objetivo: paralelismo de memoria compartida sobre CPU.
 
-- [ ] Implementar carga de datos en `scoring_openmp.c`.
-- [ ] Implementar Random Search con `#pragma omp parallel for`.
-- [ ] Validar equivalencia AUC con Fase 1.
-- [ ] Medir speedup vs Python secuencial con P ∈ {1, 2, 4, 8}.
+Plan técnico detallado y tareas concretas: ver `context/state/active-tasks.md` (definido
+2026-06-15, `traceability_data/2026_06_15_14-24.md`). Resumen ordenado:
+
+- [ ] Crear `code/C_OpenMP_MPI/npy_io.{h,c}`: parser `.npy` v1.0 mínimo (sin libs externas,
+      DEC-06), solo lectura de `matrix_A.npy`/`profiles.npy`/`labels.npy` (DEC-10).
+- [ ] Implementar carga + validación de datos en `scoring_openmp.c` (espejo de `validate_dataset`).
+- [ ] RNG SplitMix64 por candidato (`seed+k`) → Dirichlet(1,1,1) reproducible y thread-safe.
+- [ ] Score `A·P` y **AUC con manejo de empates** (`+0.5·empates`, RIESGO-03/ISSUE-008).
+- [ ] Random Search con OpenMP (best local por hilo + `#pragma omp critical`).
+- [ ] CLI (`--n-items/--k-candidates/--seed/--threads/--self-test`) y registro `C OpenMP` en
+      `results/benchmark.csv` (9 columnas, append-only).
+- [ ] Validar equivalencia AUC con Fase 1 (`--self-test` + `|ΔAUC| < 1e-4` vs Python secuencial).
+- [ ] Medir speedup vs Python secuencial con P ∈ {1, 2, 4, 8} (objetivo `≥ 3×` con P=4).
 
 ## Fase 3 — C + MPI `[PENDIENTE]`
 

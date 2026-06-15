@@ -9,7 +9,7 @@
 
 ## En progreso
 
-- [ ] Fase 2 (C + OpenMP): no iniciada. Próximo paso: definir plan detallado en `context/state/active-tasks.md`.
+- [ ] Fase 2 (C + OpenMP): **plan técnico definido** (2026-06-15, `context/state/active-tasks.md` y `traceability_data/2026_06_15_14-24.md`), pendiente de implementar. Próximo paso: crear `npy_io.{h,c}` + reescribir `scoring_openmp.c` y ejecutar el plan.
 
 ## Pendiente
 

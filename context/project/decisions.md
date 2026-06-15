@@ -80,3 +80,17 @@ Score = A · P                     (vector ℝ^{10})
 **Razón**: con el generador actual (`A` Dirichlet puro, perfiles `T/S` uniformes y `F` uniforme en {0,1,2} sin correlación con `A`), `P = W₁T+W₂S+W₃F` es común a todas las muestras y la separación entre grupos depende solo de cómo `A` pondera los ítems — pero `A` no tiene relación con la etiqueta, por lo que ningún `W` del simplex produce AUC > 0.5 ni consistencia ≥ 0.8 (ec. 4). La Fase 1 no puede validarse (RNF-02) sin esta señal.
 
 **Alcance**: no cambia la estructura de archivos definida en DEC-10 (`matrix_A.npy`, `profiles.npy`, `labels.npy` en `data/n_{n_items}/`, mismas shapes y dtypes) — solo cambian los **valores** generados. `load_or_generate*` deben regenerar (no reutilizar) los archivos afectados; documentar en el código qué cambió para que una regeneración futura sea reproducible con `seed=42`.
+
+## DEC-12 — Estrategia de la Fase 2 (C + OpenMP) `[CONFIRMADO — 2026-06-15]`
+
+**Decisión**: precisar cómo se implementa la Fase 2 (`scoring_openmp.c`), refinando DEC-06 y respetando DEC-10. Plan completo en `context/state/active-tasks.md` (traceability `traceability_data/2026_06_15_14-24.md`).
+
+- **Carga de datos**: parser `.npy` v1.0 **mínimo y propio** en C (`code/C_OpenMP_MPI/npy_io.{h,c}`), que lee directamente `matrix_A.npy`/`profiles.npy`/`labels.npy` (formato verificado con `xxd`: `<f4`/`<i4`, `fortran_order=False`, longitud de header en campo LE de 2 bytes en offset 8). Se elige carga binaria directa (la opción "carga binaria directa" de DEC-06) frente a exportar CSV adicional. Sin librerías externas (cumple `rules.md`); sin modificar los `.npy` (DEC-10); reutilizable por `scoring_mpi.c` (Fase 3).
+- **RNG**: SplitMix64 sembrado **por candidato** con `seed + k` → 3 exponenciales normalizadas = Dirichlet(1,1,1). `W_k` depende solo de `k`, lo que hace `best_auc` determinista y reproducible para P ∈ {1,2,4,8} y permite muestreo sin sección crítica. **No** se replica bit a bit el stream de `np.random.default_rng(42).dirichlet(...)` (PCG64) de la Fase 1: no es viable ni necesario, porque RF-04/`rules.md` exigen equivalencia del **valor de AUC**, no `best_W` idéntico.
+- **AUC con empates**: la fórmula de conteo de pares debe acreditar empates con 0.5 — `AUC = (concordantes + 0.5·empates)/(pos·neg)` — para igualar `roc_auc_score`. Corrige el placeholder (ISSUE-008, RIESGO-03).
+- **Equivalencia**: el criterio `|ΔAUC| < 1e-4` es sobre el **valor de AUC** (no sobre `best_W`); se valida en dos capas (`--self-test` de la función AUC con un caso de empate + comparación de `best_auc` vs Python secuencial), apoyándose en que el dataset de Fase 1 es perfectamente separable (AUC=1.0).
+- **Etiqueta de benchmark**: la columna `implementation` para esta fase es **`C OpenMP`** (estilo "Python multicore"), en `results/benchmark.csv` con el mismo esquema de 9 columnas (append-only). `t_seq` para speedup/efficiency se lee de la fila `Python secuencial` coincidente en `n_items`/`k_candidates`.
+
+**Razón**: mantener equivalencia con la Fase 1 validada sin añadir dependencias ni tocar los datos, dejando explícito qué es reproducible bit a bit (no el stream de candidatos) y qué se valida realmente (el valor de AUC).
+
+**Interpretación descartada**: exportar CSV/binarios adicionales desde Python para C (añade artefactos y toca `data/`); intentar replicar PCG64 + el algoritmo gamma de NumPy en C (inviable y no exigido); contar AUC solo con pares estrictos sin acreditar empates (diverge de sklearn).

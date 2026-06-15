@@ -1,6 +1,8 @@
 # Current Phase
 
-**Fase activa**: Fase 2 — C + OpenMP (`context/project/phases.md`), aún sin iniciar.
+**Fase activa**: Fase 2 — C + OpenMP (`context/project/phases.md`). **Plan técnico definido**
+(2026-06-15, ver `context/state/active-tasks.md` y `traceability_data/2026_06_15_14-24.md`);
+pendiente de implementar.
 
 **Fase 1 — Python Baseline**: `COMPLETADA` (2026-06-14). Implementada y validada según
 `context/state/active-tasks.md`; detalle en `traceability_data/2026_06_14_17-18.md`.
@@ -40,9 +42,27 @@
   matplotlib + pytest/ruff como dev deps) — no fue necesario crearlos, solo se agregó la
   configuración de pytest.
 
+## Plan de Fase 2 (definido 2026-06-15)
+
+Detalle completo en `context/state/active-tasks.md`. Resumen:
+
+- **Archivos**: crear `code/C_OpenMP_MPI/npy_io.{h,c}` (parser `.npy` mínimo, sin libs externas,
+  DEC-06/DEC-10); reescribir `scoring_openmp.c` (< 400 LOC); ajustar `Makefile` (añadir
+  `npy_io.c`, `-Wextra`; target `mpi` intacto).
+- **Carga**: parser binario directo de `data/n_{N}/{matrix_A,profiles,labels}.npy` (formato v1.0
+  verificado con `xxd`), CWD = `code/`. No se modifican los `.npy`.
+- **RNG**: SplitMix64 sembrado por candidato (`seed+k`) → Dirichlet(1,1,1); `W_k` depende solo
+  de `k` → `best_auc` determinista para P ∈ {1,2,4,8}, sin sección crítica en el muestreo.
+- **AUC corregida** (RIESGO-03/ISSUE-008): `(concordantes + 0.5·empates)/(pos·neg)` para igualar
+  `roc_auc_score`; validación en dos capas (`--self-test` de la función AUC + equivalencia de
+  `best_auc` vs Python secuencial, viable por separabilidad AUC=1.0).
+- **OpenMP**: best local por hilo + `#pragma omp critical` de fusión; `omp_get_wtime()` solo
+  sobre la búsqueda (excluye carga).
+- **CLI**: `--n-items/--k-candidates/--seed/--threads/--self-test`. Registro `C OpenMP` en
+  `results/benchmark.csv` (9 columnas, append-only; `t_seq` leído de la fila `Python secuencial`).
+
 ## Próxima acción
 
-Iniciar Fase 2 (`context/project/phases.md`): implementar `code/C_OpenMP_MPI/scoring_openmp.c`
-(carga de datos, Random Search con `#pragma omp parallel for`), validar equivalencia AUC con
-Fase 1 (|ΔAUC| < 1e-4, mismo seed=42/K) y medir speedup vs Python secuencial con P ∈ {1,2,4,8}.
-Definir el plan detallado de Fase 2 en `context/state/active-tasks.md` antes de implementar.
+Implementar el plan de `context/state/active-tasks.md` (Fase 2). Criterios de salida:
+`--self-test` OK, `|ΔAUC| < 1e-4` vs Python secuencial (seed=42, K=100k), `best_auc ∈ [0.5,1.0]`,
+consistencia ≥ 0.8 y `speedup ≥ 3×` con P=4 (RNF-03), con curva P ∈ {1,2,4,8}.
