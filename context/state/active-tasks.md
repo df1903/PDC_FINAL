@@ -1,6 +1,9 @@
 # Active Tasks — Fase 3 (C + MPI)
 
-**Estado: PLANIFICADA — 2026-06-15** (plan definido en
+**Estado: COMPLETADA — 2026-06-15** (implementada en `traceability_data/2026_06_15_19-32.md`).
+
+---
+**[Encabezado histórico]** Plan definido en
 `traceability_data/2026_06_15_19-22.md`, iteración 1). Pendiente de implementación.
 Fase activa: Fase 3 (C + MPI). Fases 1 (Python Baseline) y 2 (C + OpenMP) **COMPLETADAS**.
 
@@ -149,13 +152,11 @@ double time_seconds = MPI_Wtime() - t0;   /* rank 0 registra */
 
 ## 11. Criterios de salida de Fase 3 (no avanzar a Fase 4 sin esto)
 
-- [ ] `--self-test` de AUC en verde, incluido el caso con empate (RIESGO-03).
-- [ ] `|best_auc_MPI − best_auc_PySeq| < 1e-4` (mismo K=100k, seed=42, N=50); se espera
-      `1.0000 vs 1.0000`, `|ΔAUC|=0` (RF-04).
-- [ ] `best_auc ∈ [0.5, 1.0]` (se espera 1.0) y consistencia (ec. 4) ≥ 0.8.
-- [ ] `speedup ≥ 3×` con **P=4** (RNF-03); reportar curva P ∈ {1,2,4,8}. Si el overhead MPI lo
-      impide con K=100k (RIESGO-05), aportar curva K∈{500k,1M} como evidencia de amortización.
-- [ ] Filas `C MPI` (P∈{1,2,4,8}) añadidas a `results/benchmark.csv` sin perder filas previas.
+- [x] `--self-test` de AUC en verde, incluido el caso con empate (RIESGO-03). → 3/3 OK.
+- [x] `|best_auc_MPI − best_auc_PySeq| < 1e-4` (mismo K=100k, seed=42, N=50); `|ΔAUC|=0` (RF-04).
+- [x] `best_auc ∈ [0.5, 1.0]` (=1.0) y consistencia (ec. 4) ≥ 0.8 (=2.0).
+- [x] `speedup ≥ 3×` con **P=4**: `speedup(P=4)=3.65×` ✓ (RNF-03). Curva P∈{1,2,4,8} completa.
+- [x] Filas `C MPI` (P∈{1,2,4,8}) añadidas a `results/benchmark.csv` sin perder filas previas.
 - [ ] (Opcional) Sin fugas: `mpirun -n 4 valgrind --leak-check=full ./scoring_mpi --k-candidates
       1000` (se esperan bloques "still reachable" internos de OpenMPI, no del código propio).
 

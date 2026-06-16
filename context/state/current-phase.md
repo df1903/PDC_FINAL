@@ -1,8 +1,8 @@
 # Current Phase
 
-**Fase activa**: Fase 3 — C + MPI (`context/project/phases.md`). Fase 2 (C + OpenMP)
+**Fase activa**: Fase 4 — CUDA (notebook en Google Colab). Fase 3 (C + MPI)
 `COMPLETADA` (2026-06-15, ver `context/state/active-tasks.md` y
-`traceability_data/2026_06_15_14-36.md`).
+`traceability_data/2026_06_15_19-32.md`).
 
 **Fase 1 — Python Baseline**: `COMPLETADA` (2026-06-14). Implementada y validada según
 `context/state/active-tasks.md`; detalle en `traceability_data/2026_06_14_17-18.md`.
@@ -81,16 +81,36 @@ secuencial").
 - Instalado `valgrind` (no estaba disponible en el entorno) vía `apt-get` para cumplir el
   criterio de "sin fugas".
 
+## Resultados Fase 3 (seed=42, n_items=50, K=100000, desde `code/`, OpenMPI 4.1.6, WSL2)
+
+| P | best_auc | time_seconds | candidates_per_second | speedup | efficiency | speedup_vs_python |
+|:-:|----------|--------------|------------------------|---------|------------|-------------------|
+| 1 | 1.0000   | 0.039927     | 2,504,562              | 1.0000  | 1.0000     | 2411.99×          |
+| 2 | 1.0000   | 0.022423     | 4,459,637              | 1.7806  | 0.8903     | 4294.80×          |
+| 4 | 1.0000   | 0.010940     | 9,140,351              | 3.6495  | 0.9124     | 8802.50×          |
+| 8 | 1.0000   | 0.007415     | 13,485,991             | 5.3846  | 0.6731     | 12987.52×         |
+
+- `best_W = [0.08767833, 0.53756110, 0.37476056]` — idéntico para todo P (MAXLOC desempate menor k).
+- Consistencia (ec. 4) = 2.0000 en los 4 casos (≥ 0.8 ✓).
+- `|best_auc_MPI − best_auc_PySeq| = |1.0000 − 1.0000| = 0 < 1e-4` ✓ (RF-04).
+- `--self-test` de `compute_auc`: 3/3 OK, incluido caso con empate (AUC=0.875).
+- `speedup(P=4) = 3.65× ≥ 3×` ✓ (RNF-03). Superlinealidad aparente en P=2/4 (eficiencia >0.89).
+- RIESGO-05 no materializado: MPI overhead amortizado con K=100k.
+- `mpicc -O2 -Wall -Wextra`: sin warnings; 389 LOC < 400 ✓.
+
+## Cambios relevantes (Fase 3)
+
+- `code/C_OpenMP_MPI/scoring_mpi.c` reescrito (389 LOC): copia literal del cómputo de Fase 2
+  (`splitmix64_*`, `sample_dirichlet`, `compute_P`/`compute_score`/`compute_auc`/
+  `scoring_consistency`, `self_test`, `load_dataset`, `read_last_time`/`append_benchmark`);
+  `<omp.h>` reemplazado por `<mpi.h>`; sin OpenMP ni CUDA. Carga solo en rank 0 + `MPI_Bcast`;
+  regeneración local de candidatos (sin `MPI_Scatter`); `MPI_MAXLOC`/`MPI_DOUBLE_INT` para
+  reducción y reconstrucción de `best_W`; timing `MPI_Wtime`+`MPI_Barrier`; CLI sin `--threads`.
+- `code/C_OpenMP_MPI/Makefile`: target `scoring_mpi` ahora linkea `npy_io.c`.
+- `code/results/benchmark.csv`: 4 filas nuevas `C MPI` (P∈{1,2,4,8}), append-only.
+- OpenMPI 4.1.6 instalado en el entorno (RIESGO-02 resuelto).
+
 ## Próxima acción
 
-Fase 3 — C + MPI (`scoring_mpi.c`): **plan técnico definido** (2026-06-15,
-`traceability_data/2026_06_15_19-22.md`, formalizado en `context/project/decisions.md#DEC-14` y
-`context/state/active-tasks.md`). **Pendiente de implementación**.
-
-Estrategia (DEC-14): reutilizar `npy_io.{h,c}` sin cambios y **copiar literalmente** el cómputo
-de `scoring_openmp.c`; carga solo en root + `MPI_Bcast`; candidatos por **regeneración local**
-`sample_dirichlet(seed+k)` (sin `MPI_Scatter`, DEC-12); reparto contiguo por bloques; reducción
-`MPI_Reduce` con `MPI_MAXLOC`/`MPI_DOUBLE_INT` (transporta `k*`); timing `MPI_Wtime` con
-`MPI_Barrier` previo; CLI sin `--threads`; registro `C MPI` en `benchmark.csv` (10 cols, solo
-rank 0). Criterios de salida y barrido P∈{1,2,4,8} (+ K∈{500k,1M} si RIESGO-05) en
-`active-tasks.md` §11–§13.
+Fase 4 — CUDA (`CUDA/scoring_cuda.ipynb`): kernel CUDA en Google Colab (DEC-09).
+Ver `context/project/phases.md#Fase 4`.

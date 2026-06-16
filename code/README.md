@@ -2,7 +2,7 @@
 
 Implementación del proyecto de Scoring Metagenómico en distintos niveles de
 paralelismo: Python secuencial/multicore (Fase 1 — completada), C con OpenMP
-(Fase 2 — completada) / MPI (Fase 3 — en progreso, placeholder) y CUDA
+(Fase 2 — completada), C con MPI (Fase 3 — completada) y CUDA
 (Fase 4, vía notebook en Google Colab).
 
 ## Requisitos
@@ -103,17 +103,45 @@ Flags: `--n-items` (50), `--k-candidates` (100000), `--seed` (42), `--threads`
 `C OpenMP` a `results/benchmark.csv`; `speedup`/`efficiency` se calculan
 contra la última fila `Python secuencial` con el mismo `n_items`/`k_candidates`.
 
-## C + MPI (Fase 3 — en progreso)
+## C + MPI (Fase 3 — completada)
 
-`scoring_mpi.c` es por ahora un placeholder (`MPI_Init`/`MPI_Finalize` sin
-lógica de scoring). Pendiente: `MPI_Scatter` de candidatos W desde el proceso
-raíz, evaluación local de AUC y `MPI_Reduce(MPI_MAX)`, reutilizando
-`npy_io.{h,c}` (ver "Próxima acción" en `context/state/current-phase.md`).
+Compilar desde `code/C_OpenMP_MPI/`:
 
 ```bash
-make mpi          # mpicc -O2 -Wall -Wextra scoring_mpi.c -o scoring_mpi -lm
-mpirun -np 4 ./scoring_mpi
+make clean
+make mpi       # mpicc -O2 -Wall -Wextra -o scoring_mpi scoring_mpi.c npy_io.c -lm
 ```
+
+El binario `scoring_mpi` lee `data/n_{n_items}/{matrix_A,profiles,labels}.npy`
+y registra en `results/benchmark.csv`, ambos relativos al directorio de
+ejecución: **ejecutar desde `code/`**, igual que OpenMP y Python.
+
+El número de procesos lo fija `mpirun -n P`; el binario no tiene `--threads`.
+En entornos donde `mpirun` rechaza ejecutarse como root (WSL2 por defecto),
+añade `--allow-run-as-root`. Si P supera los núcleos físicos disponibles,
+añade `--oversubscribe`.
+
+```bash
+cd code   # si vienes de C_OpenMP_MPI/, usa `cd ..`
+
+# Self-test de la función AUC (incluye caso con empate)
+mpirun --allow-run-as-root -n 1 ./C_OpenMP_MPI/scoring_mpi --self-test
+
+# Run individual
+mpirun --allow-run-as-root -n 4 ./C_OpenMP_MPI/scoring_mpi \
+  --n-items 50 --k-candidates 100000 --seed 42
+
+# Barrido de procesos (resultados en context/state/current-phase.md)
+for P in 1 2 4 8; do
+  mpirun --allow-run-as-root --oversubscribe -n $P \
+    ./C_OpenMP_MPI/scoring_mpi --n-items 50 --k-candidates 100000 --seed 42
+done
+```
+
+Flags: `--n-items` (50), `--k-candidates` (100000), `--seed` (42),
+`--self-test`. Ejecutar primero con `-n 1` para crear la fila baseline
+`workers=1`; las corridas con P > 1 usan esa fila para calcular `speedup`.
+Cada run agrega una fila `C MPI` a `results/benchmark.csv`.
 
 ## CUDA (Fase 4)
 
@@ -123,10 +151,11 @@ La Fase 4 se desarrolla en `CUDA/scoring_cuda.ipynb`, ejecutado en
 
 ## Resultados
 
-Cada ejecución (Python o C OpenMP) agrega una fila a `results/benchmark.csv`
-(esquema de 9 columnas, append-only). Los resultados de Fase 1 y Fase 2 ya
-registrados, junto con su análisis, están resumidos en
-`context/state/current-phase.md`.
+Cada ejecución agrega una fila a `results/benchmark.csv` (esquema de 10
+columnas append-only: `implementation, n_items, k_candidates, workers,
+best_auc, time_seconds, candidates_per_second, speedup, efficiency,
+speedup_vs_python`). Los resultados de Fases 1–3 ya registrados, junto con
+su análisis, están resumidos en `context/state/current-phase.md`.
 
 ## Estructura
 
@@ -139,7 +168,7 @@ code/
 ├── C_OpenMP_MPI/                # Nivel 2-3: OpenMP (listo) y MPI (placeholder)
 │   ├── npy_io.{h,c}             # Parser .npy propio (sin libs externas)
 │   ├── scoring_openmp.c          # Random Search + OpenMP (Fase 2)
-│   └── scoring_mpi.c              # Random Search + MPI (Fase 3, pendiente)
+│   └── scoring_mpi.c             # Random Search + MPI (Fase 3)
 ├── CUDA/                        # Nivel 3 (Fase 4): notebook + kernel CUDA
 └── results/                     # benchmark.csv y plots/
 ```

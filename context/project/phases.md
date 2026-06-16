@@ -45,35 +45,37 @@ lost (solo "possibly lost"/"still reachable" internos de `libgomp`, no atribuibl
 propio). Detalle completo: `context/state/current-phase.md` y
 `traceability_data/2026_06_15_14-36.md`.
 
-## Fase 3 — C + MPI `[PLANIFICADA — 2026-06-15]`
+## Fase 3 — C + MPI `[COMPLETADA — 2026-06-15]`
 
 Objetivo: paralelismo de memoria distribuida sobre CPU.
 
-Plan técnico detallado y tareas concretas: ver `context/state/active-tasks.md` (definido
-2026-06-15, `traceability_data/2026_06_15_19-22.md`) y `context/project/decisions.md#DEC-14`.
-Reutiliza `npy_io.{h,c}` sin cambios y **copia literalmente** el cómputo de `scoring_openmp.c`;
-solo cambia el modelo de paralelismo (procesos MPI). Resumen ordenado:
+Plan técnico detallado: `context/state/active-tasks.md` (definido 2026-06-15,
+`traceability_data/2026_06_15_19-22.md`) y `context/project/decisions.md#DEC-14`.
+Implementación: `traceability_data/2026_06_15_19-32.md`.
 
-- [ ] Ajustar `code/C_OpenMP_MPI/Makefile`: target `scoring_mpi` debe linkear `npy_io.c`
-      (`mpicc -O2 -Wall -Wextra -o scoring_mpi scoring_mpi.c npy_io.c -lm`).
-- [ ] Reescribir `scoring_mpi.c` (< 400 LOC): copias literales de RNG SplitMix64, score/AUC con
-      empates, consistencia, `self_test`, `load_dataset`, `read_last_time`/`append_benchmark`.
-- [ ] Carga solo en root (`load_dataset`) + difusión `MPI_Bcast` de `n_items`/`A`/`profiles`/
-      `labels` (DEC-06/10/14), fuera del cronómetro.
-- [ ] Candidatos por **regeneración local** `sample_dirichlet(seed+k)` con `k` global, **sin
-      `MPI_Scatter`** (DEC-14): determinismo y equivalencia con Fases 1–2.
-- [ ] Distribución contiguo por bloques `[r·local_K, (r+1)·local_K)` (último rank absorbe
-      remanente); evaluación independiente sin comunicación durante la búsqueda.
-- [ ] Reducción `MPI_Reduce` con `MPI_MAXLOC`/`MPI_DOUBLE_INT` (transporta `best_auc` + `k*`);
-      root reconstruye `best_W = sample_dirichlet(seed+k*)`.
-- [ ] Timing `MPI_Wtime` con `MPI_Barrier` antes de `t0` (excluye carga); solo rank 0 registra.
-- [ ] CLI `--n-items/--k-candidates/--seed/--self-test` (sin `--threads`; P = `mpirun -n P`).
-- [ ] Registro `C MPI` en `results/benchmark.csv` (10 columnas, append-only, DEC-13; solo rank 0):
-      `speedup = T_mpi(1)/T_mpi(P)`, `efficiency = speedup/workers`,
-      `speedup_vs_python = T_python_secuencial/T_mpi(P)`.
-- [ ] Validar equivalencia AUC (`--self-test` + `|ΔAUC| < 1e-4` vs Python secuencial).
-- [ ] Medir speedup con P ∈ {1, 2, 4, 8} procesos (objetivo `≥ 3×` con P=4, RNF-03); si RIESGO-05
-      se materializa con K=100k, aportar curva K∈{500k,1M}.
+- [x] Ajustar `code/C_OpenMP_MPI/Makefile`: target `scoring_mpi` linkea `npy_io.c`.
+- [x] Reescribir `scoring_mpi.c` (389 LOC, < 400): copias literales de RNG SplitMix64, score/AUC
+      con empates, consistencia, `self_test`, `load_dataset`, `read_last_time`/`append_benchmark`.
+- [x] Carga solo en root + difusión `MPI_Bcast` de `n_items`/`A`/`profiles`/`labels` (DEC-14).
+- [x] Candidatos por regeneración local `sample_dirichlet(seed+k)` sin `MPI_Scatter` (DEC-14).
+- [x] Distribución contigua por bloques; reducción `MPI_MAXLOC`/`MPI_DOUBLE_INT`.
+- [x] Timing `MPI_Wtime` + `MPI_Barrier`; CLI sin `--threads`; registro `C MPI` (10 cols).
+- [x] `--self-test` 3/3 OK (incluido empate); `|ΔAUC| = 0 < 1e-4` vs Python secuencial.
+- [x] Speedup P=4: 3.65× ≥ 3× ✓ (RNF-03). Barrido P∈{1,2,4,8} completo.
+
+Resultados (seed=42, n_items=50, K=100000, desde `code/`, OpenMPI 4.1.6, WSL2):
+
+| P | best_auc | time_seconds | candidates_per_second | speedup | efficiency | speedup_vs_python |
+|:-:|----------|--------------|------------------------|---------|------------|-------------------|
+| 1 | 1.0000   | 0.039927     | 2,504,562              | 1.0000  | 1.0000     | 2411.99×          |
+| 2 | 1.0000   | 0.022423     | 4,459,637              | 1.7806  | 0.8903     | 4294.80×          |
+| 4 | 1.0000   | 0.010940     | 9,140,351              | 3.6495  | 0.9124     | 8802.50×          |
+| 8 | 1.0000   | 0.007415     | 13,485,991             | 5.3846  | 0.6731     | 12987.52×         |
+
+- `best_W = [0.08767833, 0.53756110, 0.37476056]` — idéntico para todo P (MAXLOC determinista).
+- Consistencia = 2.0000 en todos los casos (≥ 0.8 ✓).
+- `mpicc -O2 -Wall -Wextra`: sin warnings (389 LOC, dentro del límite).
+- Detalle completo: `context/state/current-phase.md` y `traceability_data/2026_06_15_19-32.md`.
 
 ## Fase 4 — CUDA (notebook en Google Colab) `[PENDIENTE]`
 
