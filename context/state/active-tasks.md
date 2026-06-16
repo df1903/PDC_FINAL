@@ -1,9 +1,12 @@
 # Active Tasks — Fase 4 (CUDA en Google Colab)
 
-**Estado: PLANIFICADA — 2026-06-16** (plan definido en
-`traceability_data/2026_06_16_00-43.md`, iteración 1; estrategia formalizada en **DEC-15**).
-Pendiente de implementación. **La ejecución ocurre en Google Colab** (runtime GPU): este plan
-se deja planteado para correrse después; no se ejecuta en el entorno local.
+**Estado: IMPLEMENTADA (código) — PENDIENTE corrida en Colab — 2026-06-16** (plan definido en
+`traceability_data/2026_06_16_00-43.md`; implementación en `traceability_data/2026_06_16_00-57.md`;
+estrategia formalizada en **DEC-15**). Los tres entregables (`scoring_cuda.ipynb`,
+`scoring_kernel.cu`, `scoring_pycuda.py`) están escritos y validados localmente **sin GPU**
+(sintaxis, LOC, equivalencia del RNG y de los helpers de host). **La ejecución y la medición de
+tiempo/speedup ocurren en Google Colab** (runtime GPU); no se ejecuta en el entorno local
+(RIESGO-01). Ver el detalle en `context/state/current-phase.md#Fase 4`.
 
 Fases 1 (Python Baseline), 2 (C + OpenMP) y 3 (C + MPI) **COMPLETADAS**.
 

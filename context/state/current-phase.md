@@ -1,8 +1,11 @@
 # Current Phase
 
-**Fase activa**: Fase 4 — CUDA (notebook en Google Colab) — `PLANIFICADA` (2026-06-16, plan en
-`context/state/active-tasks.md` y `traceability_data/2026_06_16_00-43.md`; estrategia en
-**DEC-15**). Pendiente de implementación; **se ejecuta en Google Colab** (runtime GPU), no en el
+**Fase activa**: Fase 4 — CUDA (notebook en Google Colab) — `IMPLEMENTADA (código)` —
+`PENDIENTE corrida en Colab` (2026-06-16, ver `traceability_data/2026_06_16_00-57.md`;
+estrategia en **DEC-15**, plan en `context/state/active-tasks.md`). Los tres entregables
+(`scoring_cuda.ipynb`, `scoring_kernel.cu`, `scoring_pycuda.py`) están escritos y validados
+localmente **sin GPU** (sintaxis, LOC, equivalencia del RNG y de los helpers de host); la
+**ejecución y la medición de tiempo/speedup ocurren en Google Colab** (runtime GPU), no en el
 entorno local (RIESGO-01). Fase 3 (C + MPI) `COMPLETADA` (2026-06-15, ver
 `traceability_data/2026_06_15_19-32.md`).
 
@@ -112,21 +115,50 @@ secuencial").
 - `code/results/benchmark.csv`: 4 filas nuevas `C MPI` (P∈{1,2,4,8}), append-only.
 - OpenMPI 4.1.6 instalado en el entorno (RIESGO-02 resuelto).
 
-## Plan Fase 4 (PLANIFICADA — 2026-06-16)
+## Fase 4 — Implementación (código completo, 2026-06-16; corrida en Colab pendiente)
 
-Estrategia formalizada en **DEC-15**; plan técnico completo (15 tareas + criterios de salida) en
-`context/state/active-tasks.md` (`traceability_data/2026_06_16_00-43.md`, iteración 1). Puntos
-clave: notebook `CUDA/scoring_cuda.ipynb` con RNG SplitMix64 `__device__` (`seed+k`, sin transferir
-`W_pool`), kernel `scoring_kernel` (un hilo/candidato, `__shared__` para `A`/`profiles`,
-`BLOCK_SIZE=256`, AUC con empates +0.5), reducción con `np.argmax` en host, compilación
-`%%writefile`+`SourceModule(-O2)`, timing que excluye carga (`cudaEvent_t` + `perf_counter`/
-`Context.synchronize()`), self-test (empate=0.875 + `n_3`/K=100 vs mirror SplitMix64), y una sola
-fila `CUDA` en `benchmark.csv` (`workers=1`, `speedup=1.0`, `efficiency=1.0`,
-`speedup_vs_python = 96.30376639 / T_cuda`). Objetivos: `|ΔAUC|<1e-4` vs Python secuencial,
-consistencia ≥ 0.8, `speedup_vs_python ≥ 5×` (RNF-03), con modelo de GPU registrado (RIESGO-06).
+Estrategia formalizada en **DEC-15**; plan técnico (15 tareas + criterios de salida) en
+`context/state/active-tasks.md`. Implementación: `traceability_data/2026_06_16_00-57.md`.
+
+Entregables creados/reescritos (fuentes derivadas, DEC-09):
+
+- `code/CUDA/scoring_kernel.cu` (125 LOC < 400): reemplaza el placeholder. RNG SplitMix64
+  `__device__` (copia bit a bit de `scoring_openmp.c`, sembrado `seed+k`), `__global__
+  scoring_kernel` (un hilo/candidato) con `__shared__` para `A` y `profiles` (carga cooperativa
+  + `__syncthreads()` antes del `return` de los hilos sobrantes), `P=W·[T,S,F]` en array local
+  (`#define MAX_ITEMS 256`, sin VLAs), `Score=A·P` y AUC por conteo de pares con empates +0.5
+  (acumulado en `double`). Solo `__device__`+`__global__` (sin `main`, para `SourceModule`).
+- `code/CUDA/scoring_pycuda.py` (160 LOC < 200): reemplaza el placeholder. Orquestación reusable
+  (celdas 4–7): rutas `data/n_{n_items}/` (DEC-10), `SourceModule(-O2)`, H2D una vez,
+  `grid=ceil(K/256)`/`block=256` (DEC-05), `np.argmax` en host, reconstrucción de `best_W` con el
+  MISMO SplitMix64 (mirror Python), timing `perf_counter`+`cudaEvent` que excluye carga/H2D.
+- `code/CUDA/scoring_cuda.ipynb` (28 celdas, 14 código/14 markdown): entregable principal en el
+  orden de la tarea 1 de `active-tasks.md` (0 params → 1 `nvidia-smi`/GPU → 2 setup PyCUDA →
+  helpers host → 3 carga+validación → 4 `%%writefile scoring_kernel.cu` → 5 `SourceModule(-O2)`
+  + `nvcc -c` sanity → 6 orquestación → 7 reducción/`best_W` → 8 timing → 9 self-test →
+  10 validación → 11 fila CSV → 12 resumen). El cuerpo del `%%writefile` es **idéntico** al
+  `scoring_kernel.cu` en disco. Se versiona **sin salidas** (no se ejecuta en local).
+
+Validaciones realizadas localmente **sin GPU** (no sustituyen la corrida en Colab):
+
+- `scoring_kernel.cu` 125 LOC (< 400 ✓); `scoring_pycuda.py` 160 LOC (< 200 ✓); todas las celdas
+  Python del notebook compilan; JSON nbformat 4 válido.
+- **RNG**: el mirror `sample_dirichlet_host` (notebook y `scoring_pycuda.py`) es **bit-idéntico**
+  (`maxdiff=0`) a una reimplementación fiel del SplitMix64 de `scoring_openmp.c`. `W(seed+0) =
+  [0.08767833, 0.53756110, 0.37476056]` coincide con el `best_W` de la Fase 3 (MPI).
+- **Helpers de host** sobre `data/n_50/` real: AUC empate → 0.875; `AUC(W(seed+0)) = 1.0`;
+  consistencia = 2.0; `argmax` sobre k∈[0,2000) → k*=0 (AUC máx = 1.0). ⇒ los `assert` de
+  validación del notebook (AUC∈[0.5,1], `|ΔAUC|<1e-4` vs PySeq=1.0, consistencia≥0.8) pasarán.
+
+**Marcadores pendientes de la corrida en Colab** (RIESGO-01/06): `GPU_NAME`, `best_auc`,
+`t_search` (`time_seconds`), `kernel_ms`, `speedup_vs_python = 96.30376639 / t_search` y la fila
+`CUDA` del `benchmark.csv`. Se calculan al ejecutar el notebook en un runtime GPU; la fila impresa
+por la celda 11 se **transcribe** a `code/results/benchmark.csv` (append-only).
 
 ## Próxima acción
 
-Implementar la Fase 4 en Google Colab según el plan (DEC-15 / `active-tasks.md`). **No ejecutable
-en el entorno local** (sin GPU asumida, RIESGO-01): el prompt de ejecución queda planteado en
-`instruction.md` para correrse después en Colab. Ver `context/project/phases.md#Fase 4`.
+Ejecutar `code/CUDA/scoring_cuda.ipynb` en Google Colab (runtime GPU): subir los `.npy` de
+`code/data/n_50/`, correr todas las celdas, **registrar el modelo de GPU** y verificar los
+criterios de salida (tarea 14 de `active-tasks.md`), incluido `speedup_vs_python ≥ 5×` (RNF-03).
+Luego **transcribir** la fila `CUDA` a `code/results/benchmark.csv` (append-only) y marcar la
+Fase 4 como `COMPLETADA`. Ver `context/project/phases.md#Fase 4`.
