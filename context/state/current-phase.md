@@ -1,7 +1,9 @@
 # Current Phase
 
-**Fase activa**: Fase 4 — CUDA (notebook en Google Colab). Fase 3 (C + MPI)
-`COMPLETADA` (2026-06-15, ver `context/state/active-tasks.md` y
+**Fase activa**: Fase 4 — CUDA (notebook en Google Colab) — `PLANIFICADA` (2026-06-16, plan en
+`context/state/active-tasks.md` y `traceability_data/2026_06_16_00-43.md`; estrategia en
+**DEC-15**). Pendiente de implementación; **se ejecuta en Google Colab** (runtime GPU), no en el
+entorno local (RIESGO-01). Fase 3 (C + MPI) `COMPLETADA` (2026-06-15, ver
 `traceability_data/2026_06_15_19-32.md`).
 
 **Fase 1 — Python Baseline**: `COMPLETADA` (2026-06-14). Implementada y validada según
@@ -110,7 +112,21 @@ secuencial").
 - `code/results/benchmark.csv`: 4 filas nuevas `C MPI` (P∈{1,2,4,8}), append-only.
 - OpenMPI 4.1.6 instalado en el entorno (RIESGO-02 resuelto).
 
+## Plan Fase 4 (PLANIFICADA — 2026-06-16)
+
+Estrategia formalizada en **DEC-15**; plan técnico completo (15 tareas + criterios de salida) en
+`context/state/active-tasks.md` (`traceability_data/2026_06_16_00-43.md`, iteración 1). Puntos
+clave: notebook `CUDA/scoring_cuda.ipynb` con RNG SplitMix64 `__device__` (`seed+k`, sin transferir
+`W_pool`), kernel `scoring_kernel` (un hilo/candidato, `__shared__` para `A`/`profiles`,
+`BLOCK_SIZE=256`, AUC con empates +0.5), reducción con `np.argmax` en host, compilación
+`%%writefile`+`SourceModule(-O2)`, timing que excluye carga (`cudaEvent_t` + `perf_counter`/
+`Context.synchronize()`), self-test (empate=0.875 + `n_3`/K=100 vs mirror SplitMix64), y una sola
+fila `CUDA` en `benchmark.csv` (`workers=1`, `speedup=1.0`, `efficiency=1.0`,
+`speedup_vs_python = 96.30376639 / T_cuda`). Objetivos: `|ΔAUC|<1e-4` vs Python secuencial,
+consistencia ≥ 0.8, `speedup_vs_python ≥ 5×` (RNF-03), con modelo de GPU registrado (RIESGO-06).
+
 ## Próxima acción
 
-Fase 4 — CUDA (`CUDA/scoring_cuda.ipynb`): kernel CUDA en Google Colab (DEC-09).
-Ver `context/project/phases.md#Fase 4`.
+Implementar la Fase 4 en Google Colab según el plan (DEC-15 / `active-tasks.md`). **No ejecutable
+en el entorno local** (sin GPU asumida, RIESGO-01): el prompt de ejecución queda planteado en
+`instruction.md` para correrse después en Colab. Ver `context/project/phases.md#Fase 4`.

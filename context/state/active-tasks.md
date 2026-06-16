@@ -1,194 +1,206 @@
-# Active Tasks — Fase 3 (C + MPI)
+# Active Tasks — Fase 4 (CUDA en Google Colab)
 
-**Estado: COMPLETADA — 2026-06-15** (implementada en `traceability_data/2026_06_15_19-32.md`).
+**Estado: PLANIFICADA — 2026-06-16** (plan definido en
+`traceability_data/2026_06_16_00-43.md`, iteración 1; estrategia formalizada en **DEC-15**).
+Pendiente de implementación. **La ejecución ocurre en Google Colab** (runtime GPU): este plan
+se deja planteado para correrse después; no se ejecuta en el entorno local.
 
----
-**[Encabezado histórico]** Plan definido en
-`traceability_data/2026_06_15_19-22.md`, iteración 1). Pendiente de implementación.
-Fase activa: Fase 3 (C + MPI). Fases 1 (Python Baseline) y 2 (C + OpenMP) **COMPLETADAS**.
+Fases 1 (Python Baseline), 2 (C + OpenMP) y 3 (C + MPI) **COMPLETADAS**.
 
-> El plan ya ejecutado de Fase 2 (C + OpenMP) se conserva como referencia histórica en
-> `traceability_data/2026_06_15_14-24.md`; sus resultados en `context/state/current-phase.md`.
-> Fase 3 **reutiliza `npy_io.{h,c}` sin cambios** y **copia literalmente** el cómputo de
-> `scoring_openmp.c` (RNG, score, AUC, consistencia, self-test, I/O de benchmark); solo cambia
-> el modelo de paralelismo (procesos MPI con memoria distribuida en vez de hilos OpenMP).
+> El plan ya ejecutado de Fase 3 (C + MPI) se conserva como referencia histórica en
+> `traceability_data/2026_06_15_19-22.md` (planificación) y `2026_06_15_19-32.md`
+> (implementación); sus resultados en `context/state/current-phase.md`.
+> Fase 4 **reutiliza el cómputo validado** (RNG SplitMix64, Score, AUC con empates, consistencia)
+> copiándolo de `scoring_openmp.c` como código `__device__`; solo cambia el modelo de paralelismo
+> (miles de hilos GPU, un hilo por candidato) y el lenguaje de orquestación (PyCUDA en notebook).
 
-Objetivo: implementar `code/C_OpenMP_MPI/scoring_mpi.c` (Random Search con paralelismo de
-**memoria distribuida**) **equivalente a las Fases 1 y 2** (mismo AUC, esquema de benchmark de 10
-columnas, CLI análoga sin `--threads`), leyendo los `.npy` existentes sin modificarlos (DEC-10),
-sin librerías C externas más allá de MPI (DEC-06/`stack.md`) y sin OpenMP ni CUDA. Decisiones de
-estrategia formalizadas en **DEC-14**. Ejecutar las tareas en orden; cada una valida la anterior.
+Objetivo: implementar `code/CUDA/scoring_cuda.ipynb` (Random Search con aceleración **GPU
+masiva**) **equivalente a las Fases 1–3** (mismo valor de AUC, `|ΔAUC| < 1e-4`, esquema de
+benchmark de 10 columnas), leyendo los `.npy` existentes sin modificarlos (DEC-10), sin
+dependencias más allá de PyCUDA (ya en `stack.md`), con `BLOCK_SIZE=256` (DEC-05) y `seed=42`
+(DEC-03). Estrategia formalizada en **DEC-15**. `scoring_kernel.cu` y `scoring_pycuda.py` se
+conservan como fuentes derivadas del notebook (DEC-09). Ejecutar las tareas en orden.
 
 ## Hallazgos verificados contra el repo (base del plan)
 
-- **`scoring_mpi.c` es un placeholder** (28 LOC): `MPI_Init`/`Comm_rank`/`Comm_size`/`Finalize`
-  con un `TODO` de `MPI_Scatter`/`MPI_Reduce` y un `printf`. Reemplazo completo.
-- **Cómputo ya validado en Fase 2**: `splitmix64_*`, `sample_dirichlet`, `compute_P`,
-  `compute_score`, `compute_auc` (empates a 0.5, RIESGO-03 resuelto), `scoring_consistency`,
-  `self_test`, `load_dataset`, `read_last_time`, `append_benchmark` en `scoring_openmp.c` —
-  **se copian literalmente** (sin abstracción nueva; no se modifica `scoring_openmp.c`).
-- **`npy_io.{h,c}` listo** para reutilizarse sin cambios (DEC-06/10; ya diseñado pensando en
-  Fase 3). `npy_load_f32`/`npy_load_i32` cargan `data/n_%d/{matrix_A,profiles,labels}.npy`.
-- **`benchmark.csv` en esquema de 10 columnas** (DEC-13): `..., speedup, efficiency,
-  speedup_vs_python`. Ya contiene filas de Fase 1 (Python sec/multicore) y Fase 2 (C OpenMP
-  P∈{1,2,4,8}). Append-only; no tocar filas previas ni el esquema.
-- **DEC-12 hace innecesario el `MPI_Scatter` de candidatos**: como `W_k = sample_dirichlet(seed
-  + k)` depende **solo del índice global `k`**, cada proceso regenera localmente los `W_k` de su
-  rango → cero coste de transmisión de candidatos y determinismo exacto (ver DEC-14).
-- **Dataset separable** (`best_auc = 1.0`): la equivalencia por **valor de AUC** se cumple
-  trivialmente para todo P, igual que en Fase 2.
-- **Toolchain a verificar (RIESGO-02)**: WSL2 con OpenMPI (`mpicc`/`mpirun`); confirmar
-  `mpicc --version` antes de compilar. No se requiere contenedor (gcc/WSL2 ya operativo).
+- **`scoring_kernel.cu` es un placeholder** (29 LOC): `__global__ scoring_kernel` con `auc_out[k]
+  = 0.5f` y `main()` de stub. Reemplazo completo (kernel real + RNG `__device__`).
+- **`scoring_pycuda.py` es un placeholder**: `random_search_cuda` con `raise NotImplementedError`
+  y rutas `.npy` antiguas (`../data/matrix_A.npy`, sin `n_{n_items}/`). Reescribir conforme DEC-10.
+- **Cómputo ya validado (Fases 1–3)**: `splitmix64_next`/`splitmix64_uniform01`/`sample_dirichlet`,
+  `compute_P`/`compute_score`/`compute_auc` (empates a 0.5), `scoring_consistency`, caso de
+  self-test (empate → 0.875) en `scoring_openmp.c` — se **portan a CUDA** (host/`__device__`).
+- **Datos `code/data/n_50/`**: `matrix_A.npy` (10×N float32, C-order), `profiles.npy` (N×3 float32
+  → col0=T, col1=S, col2=F), `labels.npy` (10 int32 = `[0]*5+[1]*5`). Solo lectura (DEC-10).
+- **`benchmark.csv` en esquema de 10 columnas** (DEC-13). `Python secuencial` n_50/K=100000 →
+  `time_seconds = 96.30376639` (baseline para `speedup_vs_python`). Append-only; no tocar filas
+  previas ni el esquema.
+- **Equivalencia por valor de AUC** (DEC-12/DEC-15): RF-04 exige `|ΔAUC| < 1e-4` sobre el valor de
+  AUC, no `best_W`. Se acredita en n_50 (ambos llegan a AUC=1.0).
+- **Entorno (RIESGO-01/06)**: GPU de Colab (típicamente T4); no se asume GPU local. Reproducibilidad
+  con `seed=42`, registro del modelo de GPU y promedio de repeticiones.
 
-## 1. Ajustar `code/C_OpenMP_MPI/Makefile` (target `mpi` linkea `npy_io.c`)
+## 1. Estructura del notebook `CUDA/scoring_cuda.ipynb` (orden de celdas)
 
-```make
-scoring_mpi: scoring_mpi.c npy_io.c npy_io.h
-	$(MPICC) $(CFLAGS) -o scoring_mpi scoring_mpi.c npy_io.c -lm
+| # | Celda | Contenido |
+|---|-------|-----------|
+| 0 | Markdown | Intro + parámetros `N_ITEMS=50`, `K=100000`, `SEED=42`, `BLOCK_SIZE=256`, `N_SAMPLES=10` |
+| 1 | GPU | `!nvidia-smi` → capturar y registrar el modelo de GPU (RIESGO-06) |
+| 2 | Setup | `import pycuda.autoinit, pycuda.driver as cuda`, `SourceModule`; instalar solo si falta |
+| 3 | Datos | subir/cargar `.npy` de `n_50/` + validación (espejo de `common.validate_dataset`) |
+| 4 | `%%writefile scoring_kernel.cu` | RNG `__device__` + `__global__ scoring_kernel` |
+| 5 | Compilación | `SourceModule(src, options=["-O2"])` (+ `nvcc -O2` opcional como sanity) |
+| 6 | Orquestación | H2D una vez → lanzamiento grid `ceil(K/256)` → D2H `auc_out` |
+| 7 | Reducción | `np.argmax(auc_out)` → reconstruir `best_W` |
+| 8 | Timing | `cudaEvent_t` (kernel) + `perf_counter`+`synchronize()` (búsqueda de W*) |
+| 9 | Self-test | empate=0.875 + caso `n_items=3`/K=100 vs mirror SplitMix64 |
+| 10 | Validación | AUC∈[0.5,1], `|ΔAUC|<1e-4`, consistencia≥0.8 |
+| 11 | Benchmark | construir fila `CUDA` (10 col) y mostrarla/appendear |
+| 12 | Resumen | prints de `best_W`, AUC, T, speedup, modelo de GPU |
+
+`scoring_pycuda.py` = export de las celdas 4–7 como script reusable; `scoring_kernel.cu` = el
+archivo materializado por `%%writefile` (ambos fuentes derivadas, DEC-09).
+
+## 2. Setup Colab + verificación GPU
+
+- `!nvidia-smi` para confirmar runtime GPU y **registrar el modelo** (típicamente T4) en variable
+  y en el informe — exigido por RNF-03 y RIESGO-06.
+- PyCUDA ya está en `stack.md`; Colab suele traerlo. Instalar **solo si el import falla** (no se
+  añaden dependencias nuevas al proyecto).
+
+## 3. Carga de `.npy` desde `code/data/n_50/`
+
+- Subir los tres `.npy` al runtime (`files.upload()`, `git clone` o Drive — documentar la elegida).
+- `np.load` + validación **idéntica** a `common.validate_dataset`: shapes `(10,N)`/`(N,3)`/`(10,)`,
+  dtypes `float32`/`float32`/`int32`, `T,S∈[0,1]`, `F∈{0,1,2}`, `y==[0]*5+[1]*5`.
+- Garantizar `A` contigua C-order y `float32` antes de H2D. Carga **fuera del cronómetro**.
+
+## 4. RNG — SplitMix64 `__device__` con `seed+k` (DEC-15)
+
+- Copiar `splitmix64_next`/`splitmix64_uniform01`/`sample_dirichlet` de `scoring_openmp.c` como
+  `__device__`. Cada hilo reconstruye `W_k = sample_dirichlet(seed + (uint64_t)k)` desde su índice
+  **global** `k`.
+- Idéntico a Fases 2/3 (mismo AUC por construcción, DEC-12); **cero transferencia** de `W_pool`;
+  determinista. **Descartado** W_pool en host salvo que use el mismo SplitMix64 (no PCG64).
+
+## 5. Kernel `scoring_kernel` (un hilo por candidato, `__shared__` para A)
+
+```
+grid = ceil(K/256), block = 256                  // BLOCK_SIZE=256 (DEC-05)
+__shared__ float sA[N_SAMPLES*MAX_ITEMS];         // ~2 KB para N=50
+__shared__ float sProf[MAX_ITEMS*3];              // carga cooperativa + __syncthreads()
+por hilo k (k = blockIdx.x*blockDim.x + threadIdx.x; if (k>=K) return;):
+   W_k = sample_dirichlet(seed + k)               // RNG device (tarea 4)
+   for i: P[i] = W0*sProf[i,0] + W1*sProf[i,1] + W2*sProf[i,2]   // array local, N≤MAX_ITEMS
+   for j(10): score[j] = Σ_i sA[j,i]*P[i]
+   auc = conteo de pares 5×5 con empates +0.5      // acumular en double
+   auc_out[k] = (float)auc
 ```
 
-- `CFLAGS = -O2 -Wall -Wextra` ya existe; alias `make mpi` ya existe. Sin `-fopenmp` (esta fase
-  no usa OpenMP). No tocar el target `scoring_openmp`.
+- `__shared__` cachea `A` (10×N) y `profiles` reusados por los 256 hilos del bloque
+  (`coding-standards.md`); cabe holgado en 48 KB.
+- `P` por hilo en array local dimensionado por `#define MAX_ITEMS` (p. ej. 256) — **sin VLAs**.
+- AUC replica la fórmula de empates de `scoring_openmp.c` (RIESGO-03).
 
-## 2. Reescribir `code/C_OpenMP_MPI/scoring_mpi.c` (< 400 LOC, lógica separada de `main`)
+## 6. Reducción — `np.argmax` en host (DEC-15)
 
-Estructura (espejo de `scoring_openmp.c`, `#define` para constantes, sin VLAs):
+- D2H de `auc_out` (K=100k float32 ≈ 400 KB, despreciable) → `np.argmax` (primer máximo →
+  desempate por menor `k`, igual a Fase 1 y al `MAXLOC` de Fase 3) → `best_W =
+  sample_dirichlet(seed + k*)` reconstruido en host.
+- **Justificación**: un reduction kernel añade complejidad (`<400 LOC`) sin ganancia a esta escala;
+  `argmax` host también es la lógica de `evaluate_candidates` (Fase 1).
 
-- **Copias literales** desde `scoring_openmp.c`: RNG (tarea 3), score/AUC/consistencia (tarea 5),
-  `self_test` (tarea 8), `load_dataset` (tarea 4), `read_last_time`/`append_benchmark` (tarea 10).
-- **Nuevo** (lógica MPI): `MPI_Init`, partición de trabajo, `random_search_mpi`, reducción,
-  timing y `main` orquestador. Estimación total ≈ **305–340 LOC** (< 400).
-- Includes: reemplazar `<omp.h>` por `<mpi.h>`; conservar `<getopt.h>`, `<math.h>`, `<stdint.h>`,
-  `"npy_io.h"`. Quitar `omp_*`.
+## 7. Compilación — `%%writefile` + `SourceModule(-O2)` (DEC-15)
 
-## 3. Generación de candidatos W ~ Dirichlet(1,1,1) — regeneración local (DEC-14)
+- `%%writefile scoring_kernel.cu` **materializa el fuente derivado** (DEC-09/nomenclatura).
+- Se lee y se pasa a `pycuda.compiler.SourceModule(source, options=["-O2"])` (JIT) para orquestar.
+- `!nvcc -O2 scoring_kernel.cu` opcional como **chequeo de sintaxis**.
+- Para `SourceModule` el `.cu` lleva solo `__device__`+`__global__` (sin `main`); `< 400 LOC`.
 
-- Copia literal de `splitmix64_next`/`splitmix64_uniform01`/`sample_dirichlet`.
-- Cada proceso, en su rango, llama `sample_dirichlet(W, seed + (uint64_t)k)` con el **`k`
-  global**. **Sin `MPI_Scatter` de candidatos** (DEC-14): el conjunto total `{W_0…W_{K-1}}` es
-  idéntico al de Fases 1 y 2; solo cambia **qué proceso** evalúa cada `k`. ⇒ `best_auc`
-  determinista e idéntico para todo P, sin coste de transmisión de candidatos.
+## 8. Orquestación PyCUDA (H2D / D2H + lanzamiento)
 
-## 4. Carga de datos en root + difusión `MPI_Bcast` (DEC-06/10/14)
+- **H2D una sola vez** (`coding-standards.md`): `A`, `profiles`, `labels` (`mem_alloc` +
+  `memcpy_htod`); `auc_out` device (K float32).
+- Lanzamiento: `kernel(dA, dProf, dLabels, dAuc, np.int32(N), np.int32(K), np.uint64(SEED),
+  block=(256,1,1), grid=(ceil(K/256),1))`.
+- D2H: `auc_out` → host. Macro `CUDA_CHECK` para verificar errores CUDA.
 
-- **Solo rank 0** llama `load_dataset(n_items)` (copia literal; valida shapes, T/S∈[0,1],
-  F∈{0,1,2}, `labels==[0]*5+[1]*5`). Carga **fuera del cronómetro**.
-- Difusión antes de la búsqueda, en orden:
-  1. `MPI_Bcast(&n_items, 1, MPI_INT, 0, MPI_COMM_WORLD)`.
-  2. Ranks ≠ 0 hacen `malloc` de `A` (`10*n_items` f32), `profiles` (`n_items*3` f32),
-     `labels` (10 i32).
-  3. `MPI_Bcast` de `A` (`MPI_FLOAT`), `profiles` (`MPI_FLOAT`), `labels` (`MPI_INT`).
-- Datos minúsculos (~710 floats); `Bcast` despreciable. Reutiliza `npy_io` sin cambios.
+## 9. Medición de tiempo (excluye carga de datos)
 
-## 5. Distribución de trabajo + Score/AUC
+- **`cudaEvent_t`** alrededor del kernel puro → tiempo de cómputo GPU (análisis/Amdahl Fase 5).
+- **`time.perf_counter`** con `cuda.Context.synchronize()` envolviendo [lanzamiento → sync → D2H →
+  argmax] = tiempo de **búsqueda de W\*** → es el `time_seconds` registrado en el CSV.
+- Se **excluye** la carga `.npy` y la **H2D única** de A/profiles/labels (análoga a "carga de
+  datos", `rules.md` §Benchmark). Decisión explícita (DEC-15).
 
-- **Reparto contiguo por bloques**:
-  `local_K = K / size; start = rank*local_K; end = (rank==size-1) ? K : start+local_K;`
-  (el último rank absorbe el remanente si `K % size != 0`). Evaluación **independiente, sin
-  comunicación durante la búsqueda**.
-- Cómputo copiado literalmente: `compute_P`, `compute_score`, `compute_auc` (`+0.5·empates`,
-  ec. 3), `scoring_consistency` (ec. 4). Acumular en `double`.
-- Cada proceso mantiene `local_best_auc` y `local_best_k` (índice **global**; init al primer `k`
-  del rango; actualizar solo con `auc > local_best` estricto → desempate consistente).
+## 10. Self-test (N=3 / K=100)
 
-## 6. Reducción distribuida — `MPI_MAXLOC` con `MPI_DOUBLE_INT` (DEC-14)
+1. **Unitario AUC**: caso `score=[1,2,2,3]`, `y=[0,0,1,1]` → **0.875** exacto (mismo de `self_test`
+   en C, RIESGO-03).
+2. **Extremo-a-extremo** `n_items=3`/K=100: comparar `best_auc` CUDA vs una **referencia Python con
+   el MISMO SplitMix64** (mirror en el notebook) → `|ΔAUC|≈0`.
 
-- Estrategia elegida: cada proceso empaqueta `{double auc; int k_global;}` y
-  `MPI_Reduce(&local, &global, 1, MPI_DOUBLE_INT, MPI_MAXLOC, 0, MPI_COMM_WORLD)`.
-- El root recibe el AUC máximo **y su `k*` global**; reconstruye `best_W =
-  sample_dirichlet(seed + k*)` (1 evaluación) y recalcula `score`/consistencia para imprimir.
-- **Por qué `MAXLOC` y no `MPI_MAX`**: `MPI_MAX` da el AUC pero no el `k*`, obligando a re-buscar
-  el óptimo (ambiguo con muchos empates en AUC=1.0). `MAXLOC` transporta el índice y resuelve
-  empates por **menor `k`** → `best_W` reproducible y fijo respecto a P (mejora menor sobre
-  Fase 2, donde `best_W` variaba con P; no afecta el criterio de equivalencia).
+> ⚠️ Comparar el caso chico directamente contra `sequential.py` (PCG64, K=100) **no es
+> apples-to-apples** (RNG distinto) y puede diferir > 1e-4 sin que haya bug. Por eso el caso chico
+> usa el mirror SplitMix64; la equivalencia formal "vs Python secuencial" se acredita en n_50
+> (ambos → AUC=1.0, `|ΔAUC|=0`).
 
-## 7. Medición de tiempo — `MPI_Wtime()` + `MPI_Barrier`
+## 11. Registro en `results/benchmark.csv` (10 columnas, append-only, DEC-13)
 
-```c
-MPI_Barrier(MPI_COMM_WORLD);
-double t0 = MPI_Wtime();
-/* búsqueda local */
-MPI_Reduce(..., MPI_MAXLOC, 0, MPI_COMM_WORLD);
-double time_seconds = MPI_Wtime() - t0;   /* rank 0 registra */
-```
+Una sola fila (no hay barrido P, solo un punto de medición):
 
-- **`MPI_Barrier` antes de `t0`**: sincroniza el arranque de todos los procesos (que parten en
-  instantes distintos por el lanzamiento de `mpirun` y el `Bcast`), de modo que `t1 − t0` mida el
-  tiempo del proceso más lento (el real de la fase paralela), no el desfase de arranque. El
-  `MPI_Reduce` final ya es punto de sincronización para cerrar `t1`. Excluye carga `.npy` y
-  escritura de CSV (ec. 7 / `rules.md`).
-
-## 8. Self-test
-
-- Copia literal de `self_test()` (3 casos de `compute_auc`, incluido empate → AUC=0.875).
-- Lo ejecuta **solo rank 0**; luego `MPI_Finalize`. Invocar con
-  `mpirun -n 1 ./scoring_mpi --self-test` (`MPI_Init/Finalize` presentes igualmente).
-
-## 9. CLI
-
-- `getopt_long`: `--n-items` (50), `--k-candidates` (100000), `--seed` (42), `--self-test`.
-  **Sin `--threads`**: el nº de procesos lo fija `mpirun -n P` (`MPI_Comm_size`).
-- El parseo corre en todos los ranks (mismos `argv`); seguro. Ruta `data/n_%d/` con CWD = `code/`.
-
-## 10. Registro en `results/benchmark.csv` (10 columnas, append-only, DEC-13) — solo rank 0
-
-- Copia literal de `read_last_time` y `append_benchmark`. Adaptaciones mínimas:
-
-| columna | valor en C MPI |
+| columna | valor en CUDA |
 |---|---|
-| `implementation` | `C MPI` |
-| `workers` | `size` (`MPI_Comm_size`) |
-| `best_auc`, `time_seconds` | del run (tiempo solo de búsqueda, `MPI_Wtime`) |
+| `implementation` | `CUDA` |
+| `n_items` / `k_candidates` | `50` / `100000` |
+| `workers` | `1` (1 GPU) |
+| `best_auc`, `time_seconds` | del run (tiempo solo de búsqueda, tarea 9) |
 | `candidates_per_second` | `K / time_seconds` |
-| `speedup` | `T_mpi(workers=1) / T_mpi(workers)` (baseline propio, DEC-13) |
-| `efficiency` | `speedup / workers` |
-| `speedup_vs_python` | `T_python_secuencial / T_mpi(workers)` |
+| `speedup` | `1.0` (sin barrido P) |
+| `efficiency` | `1.0` |
+| `speedup_vs_python` | `T_python_secuencial / T_cuda` (`T_python_secuencial = 96.30376639`) |
 
-- `speedup`: con `size==1`, baseline = esta misma corrida (`has_speedup=1`); con `size>1`,
-  `read_last_time(BENCHMARK_CSV, "C MPI", n_items, k_candidates, 1, &t_mpi1)`.
-- `speedup_vs_python`: `read_last_time(..., "Python secuencial", ..., -1, ...)`.
-- **Solo rank 0** abre/escribe el CSV → sin condiciones de carrera. Header solo si falta;
-  append-only; no sobrescribir filas previas.
+- El CSV se genera **en Colab** ⇒ la fila se **transcribe/appendea** a `code/results/benchmark.csv`
+  del repo sin tocar filas previas ni el esquema de 10 columnas.
 
-## 11. Criterios de salida de Fase 3 (no avanzar a Fase 4 sin esto)
+## 12. Validación de correctitud (RF-04 / RNF-02)
 
-- [x] `--self-test` de AUC en verde, incluido el caso con empate (RIESGO-03). → 3/3 OK.
-- [x] `|best_auc_MPI − best_auc_PySeq| < 1e-4` (mismo K=100k, seed=42, N=50); `|ΔAUC|=0` (RF-04).
-- [x] `best_auc ∈ [0.5, 1.0]` (=1.0) y consistencia (ec. 4) ≥ 0.8 (=2.0).
-- [x] `speedup ≥ 3×` con **P=4**: `speedup(P=4)=3.65×` ✓ (RNF-03). Curva P∈{1,2,4,8} completa.
-- [x] Filas `C MPI` (P∈{1,2,4,8}) añadidas a `results/benchmark.csv` sin perder filas previas.
-- [ ] (Opcional) Sin fugas: `mpirun -n 4 valgrind --leak-check=full ./scoring_mpi --k-candidates
-      1000` (se esperan bloques "still reachable" internos de OpenMPI, no del código propio).
+- `best_auc ∈ [0.5, 1.0]` (esperado 1.0).
+- `|best_auc_CUDA − best_auc_PySeq| < 1e-4` (mismo K=100k, seed=42, N=50; esperado 0).
+- Consistencia (ec. 4) ≥ 0.8 (esperado 2.0), computando `scoring_consistency(best_W)` en host.
 
-## 12. RIESGO-05 — overhead MPI con K pequeño
+## 13. Rendimiento (RNF-03) y entorno
 
-- Con N=50/K=100k el cómputo P=1 es ~0.03 s (referencia Fase 2); `MPI_Init` (arranque de
-  procesos, PMIx/red), `Bcast` y `Reduce` añaden overhead fijo que puede acercar/superar la
-  ganancia, sobre todo en P=8. Es posible `speedup(P=4) < 3×` con K=100k.
-- **Mitigación**: medir también `K ∈ {500k, 1M}` y reportar la curva speedup vs K (K mínimo
-  amortizable). K=100k se mantiene como caso por defecto para comparabilidad con Fases 1–2.
-  Alimenta el análisis de Amdahl (Fase 5).
+- `speedup_vs_python = 96.30 / T_cuda ≥ 5×` (objetivo CUDA). Con T4 se espera holgadamente.
+- **Registrar el modelo de GPU**; mitigar RIESGO-06: `seed=42`, repetir y promediar, conservar
+  `scoring_kernel.cu`/`scoring_pycuda.py` para reejecución.
 
-## 13. Entorno y comandos
+## 14. Criterios de salida de Fase 4 (no avanzar a Fase 5 sin esto)
 
-```bash
-# Compilar (desde code/C_OpenMP_MPI/)
-make mpi     # mpicc -O2 -Wall -Wextra -o scoring_mpi scoring_mpi.c npy_io.c -lm
+- [ ] Self-test de AUC en verde, incluido el caso con empate → 0.875 (RIESGO-03).
+- [ ] Self-test `n_items=3`/K=100 vs mirror SplitMix64 → `|ΔAUC| ≈ 0`.
+- [ ] `|best_auc_CUDA − best_auc_PySeq| < 1e-4` en n_50/K=100k (RF-04); `best_auc ∈ [0.5,1.0]`.
+- [ ] Consistencia (ec. 4) ≥ 0.8.
+- [ ] `speedup_vs_python ≥ 5×` (RNF-03), con modelo de GPU registrado.
+- [ ] Fila `CUDA` añadida a `results/benchmark.csv` sin perder filas previas ni cambiar el esquema.
+- [ ] `scoring_kernel.cu` < 400 LOC; `scoring_pycuda.py` actualizado (rutas `n_{n_items}/`, DEC-10).
 
-# Ejecutar (CWD = code/)
-cd code
-mpirun -n 1 ./C_OpenMP_MPI/scoring_mpi --self-test
-for P in 1 2 4 8; do mpirun -n $P ./C_OpenMP_MPI/scoring_mpi --n-items 50 --k-candidates 100000 --seed 42; done
-cat results/benchmark.csv
+## 15. Entorno y comandos (en Google Colab)
+
+```text
+# En Colab (runtime GPU):
+#  1) Subir code/data/n_50/{matrix_A,profiles,labels}.npy al runtime.
+#  2) Abrir CUDA/scoring_cuda.ipynb y ejecutar todas las celdas en orden.
+#  3) Verificar GPU:           !nvidia-smi
+#  4) (opcional) sanity nvcc:  !nvcc -O2 scoring_kernel.cu -o /tmp/k   # solo compila
+#  5) Tras la corrida: transcribir la fila CUDA a code/results/benchmark.csv (append-only).
 ```
 
-- Correr `-n 1` **primero** (crea la fila baseline `workers=1` para el `speedup` de los demás P).
-- Si OpenMPI rechaza P > núcleos físicos: añadir `--oversubscribe`.
-- Toolchain a verificar (RIESGO-02): WSL2 + OpenMPI. Límite de 400 LOC por archivo C respetado.
+- **No ejecutable en el entorno local** (sin GPU asumida, RIESGO-01): se deja planteado para Colab.
 
 ## Restricciones (recordatorio)
 
-Sin OpenMP ni CUDA en esta fase · sin nuevas dependencias más allá de MPI (ya en `stack.md`) ·
-sin modificar `npy_io.{h,c}` ni `scoring_openmp.c` · sin modificar
-`matrix_A.npy`/`profiles.npy`/`labels.npy` (solo lectura) · sin tocar filas previas ni el esquema
-de 10 columnas de `benchmark.csv` · `scoring_mpi.c` < 400 LOC.
+Sin modificar `scoring_openmp.c` · `scoring_mpi.c` · `npy_io.{h,c}` · sin tocar los `.npy`
+(solo lectura) · sin tocar filas previas ni el esquema de 10 columnas de `benchmark.csv` ·
+`scoring_kernel.cu` **< 400 LOC** · sin dependencias nuevas más allá de PyCUDA (ya en `stack.md`) ·
+`BLOCK_SIZE = 256` (DEC-05) · `seed = 42` (DEC-03) · `workers = 1` en el CSV (1 GPU, sin barrido P).

@@ -178,3 +178,67 @@ y comunicación que DEC-12 hace innecesarias); `MPI_MAX` sobre `best_auc` sin tr
 (ambiguo para reconstruir `best_W`); reescribir/abstraer el cómputo en vez de copiarlo literal
 (arriesga divergencia de AUC); medir tiempo sin `MPI_Barrier` previo (mezcla desfase de arranque
 con cómputo).
+
+## DEC-15 — Estrategia de la Fase 4 (CUDA en Google Colab) `[PLANIFICADA — 2026-06-16]`
+
+**Decisión**: precisar cómo se implementa la Fase 4 (`CUDA/scoring_cuda.ipynb` como entregable
+principal; `scoring_kernel.cu` y `scoring_pycuda.py` como fuentes derivadas), reutilizando el
+cómputo ya validado de las Fases 1–3 y respetando DEC-03/DEC-05/DEC-09/DEC-10/DEC-13. Plan
+completo en `context/state/active-tasks.md` (traceability `traceability_data/2026_06_16_00-43.md`).
+
+- **RNG en device (SplitMix64 `__device__`, no W_pool transferido)**: se copian
+  `splitmix64_next`/`splitmix64_uniform01`/`sample_dirichlet` de `scoring_openmp.c` como funciones
+  `__device__`. Cada hilo `k` reconstruye `W_k = sample_dirichlet(seed + k)` desde su índice
+  **global**, idéntico a Fases 2/3 (DEC-12). Esto da el **mismo AUC por construcción**,
+  determinismo y **cero transferencia** de candidatos (ahorra K×3 floats H2D). **Descartado**
+  W_pool pre-generado en host: solo sería válido con el mismo SplitMix64 (no
+  `np.random.dirichlet`/PCG64, que es otro stream) y añade transferencia sin ganancia.
+- **Equivalencia por valor de AUC (no por `best_W`)**: como en DEC-12, RF-04 exige `|ΔAUC| < 1e-4`
+  sobre el **valor de AUC**, no `best_W` idéntico. Se acredita en el caso principal n_50/K=100k,
+  donde Python secuencial (PCG64) y CUDA (SplitMix64) llegan ambos a AUC=1.0 (dataset separable).
+- **Kernel `scoring_kernel` (un hilo = un candidato)**: `BLOCK_SIZE=256` (DEC-05);
+  `__shared__` cachea `A` (10×N) y `profiles` por bloque (carga cooperativa + `__syncthreads()`);
+  cada hilo calcula `P_i = W0·T_i+W1·S_i+W2·F_i` (array local, sin VLAs, `#define MAX_ITEMS`),
+  `Score_j = Σ_i A[j,i]·P_i` y AUC por conteo de pares 5×5 **con empates a 0.5** (copia de la
+  fórmula de `scoring_openmp.c`, RIESGO-03). Acumular AUC en `double`.
+- **Reducción con `np.argmax` en host (no kernel de reducción)**: D2H de `auc_out` (K float32 ≈
+  400 KB, despreciable) + `np.argmax` (primer máximo → desempate por menor `k`, igual a Fase 1 y
+  al `MAXLOC` de Fase 3); `best_W = sample_dirichlet(seed + k*)` se reconstruye en host. **Razón**:
+  un reduction kernel añade complejidad (presupuesto `<400 LOC`) sin ganancia a esta escala.
+- **Compilación `%%writefile` + `pycuda.compiler.SourceModule(-O2)`**: `%%writefile
+  scoring_kernel.cu` materializa el fuente derivado (DEC-09); se compila JIT vía `SourceModule`
+  con `options=["-O2"]` para orquestar en el mismo flujo. `nvcc -O2` queda como chequeo de
+  sintaxis opcional. El `.cu` para `SourceModule` lleva solo `__device__`+`__global__` (sin
+  `main`); `< 400 LOC`.
+- **Orquestación PyCUDA**: H2D **una sola vez** de `A`/`profiles`/`labels` (coding-standards);
+  lanzamiento `grid=(ceil(K/256),1)`, `block=(256,1,1)`; D2H de `auc_out`. Macro `CUDA_CHECK`.
+- **Timing que excluye carga**: `time.perf_counter` con `cuda.Context.synchronize()` envolviendo
+  [lanzamiento → sync → D2H → argmax] = tiempo de búsqueda de W* → es el `time_seconds` del CSV.
+  `cudaEvent_t` mide el kernel puro para análisis (Fase 5). Se **excluye** la carga `.npy` y la
+  H2D única de A/profiles/labels (análoga a "carga de datos", `rules.md`).
+- **Self-test**: (a) unitario del conteo AUC con empate → 0.875 exacto (RIESGO-03); (b)
+  extremo-a-extremo `n_items=3`/K=100 comparando `best_auc` CUDA contra una **referencia Python
+  con el MISMO SplitMix64** (mirror en el notebook) → `|ΔAUC|≈0`. Comparar el caso chico directo
+  contra `sequential.py` (PCG64, K=100) **no es apples-to-apples** y puede diferir > 1e-4 sin bug;
+  la equivalencia formal "vs Python secuencial" se acredita en n_50 (ambos → AUC=1.0).
+- **Etiqueta de benchmark `CUDA`, esquema de 10 columnas (DEC-13), append-only**: una sola fila
+  (no hay barrido P, solo un punto de medición). `workers = 1` (1 GPU) ⇒ `speedup = 1.0`,
+  `efficiency = 1.0`; `speedup_vs_python = T_python_secuencial / T_cuda`
+  (`T_python_secuencial = 96.30376639` de la fila `Python secuencial` n_50/K=100000). El CSV se
+  genera en Colab ⇒ la fila se **transcribe/appendea** a `code/results/benchmark.csv` del repo sin
+  tocar filas previas ni el esquema.
+- **Entorno y reproducibilidad (RIESGO-01/RIESGO-06)**: ejecución en runtime GPU de Colab
+  (típicamente T4); **registrar el modelo de GPU**; `seed=42`; repetir la medición y promediar;
+  conservar `scoring_kernel.cu`/`scoring_pycuda.py` para reejecución.
+
+**Razón**: maximizar la reutilización del cómputo ya validado (mismo AUC garantizado, menor
+superficie de error), evitar transferencias innecesarias (RNG en device, argmax en host) y
+mantener la equivalencia con Fases 1–3 y el esquema de métricas de DEC-13, dentro de las
+restricciones (`.cu < 400 LOC`, sin dependencias nuevas más allá de PyCUDA, `BLOCK_SIZE=256`,
+`seed=42`, `workers=1`).
+
+**Interpretación descartada**: W_pool con `np.random.dirichlet` (PCG64) transferido a device
+(diverge del RNG canónico DEC-12 y añade H2D); kernel de reducción para `best_auc`/`best_k`
+(complejidad innecesaria a esta escala); comparar el self-test chico contra `sequential.py` con
+RNG distinto (no apples-to-apples); incluir la H2D de datos en el cronómetro (contradice "excluye
+carga de datos" de `rules.md`).

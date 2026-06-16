@@ -77,16 +77,34 @@ Resultados (seed=42, n_items=50, K=100000, desde `code/`, OpenMPI 4.1.6, WSL2):
 - `mpicc -O2 -Wall -Wextra`: sin warnings (389 LOC, dentro del límite).
 - Detalle completo: `context/state/current-phase.md` y `traceability_data/2026_06_15_19-32.md`.
 
-## Fase 4 — CUDA (notebook en Google Colab) `[PENDIENTE]`
+## Fase 4 — CUDA (notebook en Google Colab) `[PLANIFICADA — 2026-06-16]`
 
 Objetivo: aceleración GPU masiva en `CUDA/scoring_cuda.ipynb`, ejecutado en Colab.
 
-- [ ] Crear `scoring_cuda.ipynb` con celdas: setup/GPU → `%%writefile scoring_kernel.cu` → compilación `nvcc` → orquestación PyCUDA.
-- [ ] Implementar kernel `scoring_kernel` (un hilo por candidato W_k; calcula `P=W·[T,S,F]` y `Score=A·P`).
-- [ ] Usar `__shared__` memory para filas de A por bloque.
-- [ ] Implementar reduction kernel para AUC máximo.
-- [ ] Subir los `.npy` de `code/data/` al runtime de Colab.
-- [ ] Medir speedup vs Python secuencial y registrar el modelo de GPU usado.
+Plan técnico detallado: `context/state/active-tasks.md` (definido 2026-06-16,
+`traceability_data/2026_06_16_00-43.md`) y `context/project/decisions.md#DEC-15`. **La ejecución
+ocurre en Google Colab** (runtime GPU); el plan se deja planteado para correrse después (no es
+ejecutable en el entorno local, RIESGO-01). Resumen ordenado:
+
+- [ ] Crear `scoring_cuda.ipynb` con celdas: setup/GPU → carga `.npy` → `%%writefile
+      scoring_kernel.cu` → compilación `SourceModule(-O2)` → orquestación PyCUDA → reducción →
+      timing → self-test → validación → registro CSV (DEC-15, tarea 1 de active-tasks).
+- [ ] RNG SplitMix64 `__device__` sembrado con `seed+k` (copia de `scoring_openmp.c`); cada hilo
+      reconstruye `W_k` desde el índice global — sin transferir `W_pool` (DEC-12/DEC-15).
+- [ ] Kernel `scoring_kernel` (un hilo por candidato): `__shared__` cachea `A` y `profiles` por
+      bloque (`BLOCK_SIZE=256`, DEC-05); calcula `P=W·[T,S,F]`, `Score=A·P` y AUC con empates +0.5.
+- [ ] Reducción con `np.argmax` en host (no kernel de reducción) + reconstrucción de `best_W`
+      (DEC-15, justificación).
+- [ ] Compilación con `%%writefile` + `pycuda.compiler.SourceModule(-O2)`; `nvcc -O2` como sanity.
+- [ ] Orquestación PyCUDA: H2D una vez, lanzamiento grid `ceil(K/256)`, D2H `auc_out`; `CUDA_CHECK`.
+- [ ] Timing que excluye carga: `cudaEvent_t` (kernel) + `perf_counter`+`Context.synchronize()`
+      (búsqueda de W*).
+- [ ] Self-test: empate → 0.875 y caso `n_items=3`/K=100 vs mirror SplitMix64 (`|ΔAUC|≈0`).
+- [ ] Subir los `.npy` de `code/data/n_50/` al runtime de Colab (solo lectura, DEC-10).
+- [ ] Validar `AUC∈[0.5,1]`, `|ΔAUC|<1e-4` vs Python secuencial, consistencia ≥ 0.8.
+- [ ] Registrar fila `CUDA` en `results/benchmark.csv` (10 col, DEC-13): `workers=1`, `speedup=1.0`,
+      `efficiency=1.0`, `speedup_vs_python = T_python_secuencial / T_cuda`.
+- [ ] Medir `speedup_vs_python ≥ 5×` (RNF-03) y registrar el modelo de GPU usado (RIESGO-06).
 
 ## Fase 5 — Benchmarking `[PENDIENTE]`
 
