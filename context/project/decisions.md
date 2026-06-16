@@ -128,3 +128,53 @@ en cualquier análisis de Amdahl (Fase 6) y conservar la comparación entre leng
 para todas las implementaciones (DEC-11/`rules.md` previos a esta decisión) — válido para
 Python multicore (su baseline P=1 ya es Python secuencial) pero no generalizable a C/CUDA, cuyo
 baseline P=1 es su propia versión de un hilo/proceso.
+
+## DEC-14 — Estrategia de la Fase 3 (C + MPI) `[CONFIRMADO — 2026-06-15]`
+
+**Decisión**: precisar cómo se implementa la Fase 3 (`scoring_mpi.c`), reutilizando el cómputo
+ya validado de la Fase 2 (DEC-12) y respetando DEC-06/DEC-10/DEC-13. Plan completo en
+`context/state/active-tasks.md` (traceability `traceability_data/2026_06_15_19-22.md`).
+
+- **Reutilización sin reescritura**: `scoring_mpi.c` **copia literalmente** de `scoring_openmp.c`
+  el RNG SplitMix64, `compute_P`/`compute_score`/`compute_auc` (empates a 0.5)/
+  `scoring_consistency`, `self_test`, `load_dataset`, `read_last_time` y `append_benchmark`. Se
+  reutiliza `npy_io.{h,c}` **sin cambios**. No se modifica `scoring_openmp.c` ni `npy_io.{h,c}`.
+  Solo cambia el modelo de paralelismo (procesos MPI con memoria distribuida en vez de hilos
+  OpenMP). Esto garantiza el mismo valor de AUC por construcción.
+- **Regeneración local de candidatos en vez de `MPI_Scatter`**: como `W_k = sample_dirichlet(seed
+  + k)` depende **solo del índice global `k`** (DEC-12), cada proceso regenera localmente los
+  `W_k` de su rango contiguo `[r·local_K, (r+1)·local_K)` (el último rank absorbe el remanente).
+  El conjunto total `{W_0…W_{K-1}}` evaluado es idéntico al de Fases 1 y 2; solo cambia **qué
+  proceso** evalúa cada `k`. ⇒ `best_auc` determinista e idéntico para todo P, **sin coste de
+  transmisión de candidatos** ni sección crítica. Esto **reemplaza** el `MPI_Scatter` de
+  candidatos descrito en `architecture.md`/`phases.md`/el placeholder, que DEC-12 vuelve
+  innecesario y subóptimo.
+- **Carga solo en root + `MPI_Bcast`**: solo rank 0 lee los `.npy` (`load_dataset`, fuera del
+  cronómetro) y difunde `n_items`, `A`, `profiles`, `labels` con `MPI_Bcast` antes de la
+  búsqueda. Datos minúsculos (~710 floats); coste despreciable.
+- **Reducción con `MPI_MAXLOC` (`MPI_DOUBLE_INT`)**, no `MPI_MAX`: cada proceso reduce
+  `{best_auc, k*_global}`; el root obtiene el AUC máximo **y su índice global**, y reconstruye
+  `best_W = sample_dirichlet(seed + k*)` con una sola evaluación. `MAXLOC` desempata por **menor
+  `k`**, dando un `best_W` reproducible y fijo respecto a P (mejora menor sobre Fase 2). Se
+  descarta `MPI_MAX` sobre `best_auc` porque no transporta `k*` y obliga a re-buscar el óptimo
+  (ambiguo con muchos empates en AUC=1.0).
+- **Timing `MPI_Wtime` + `MPI_Barrier`**: `MPI_Barrier` antes de `t0` sincroniza el arranque
+  (procesos parten en instantes distintos) para que `t1 − t0` mida el proceso más lento, no el
+  desfase de lanzamiento; `t1` se cierra tras el `MPI_Reduce` (ya sincronizante). Excluye carga.
+- **CLI sin `--threads`**: el nº de procesos lo fija `mpirun -n P` (`MPI_Comm_size`); CLI =
+  `--n-items/--k-candidates/--seed/--self-test`.
+- **Etiqueta de benchmark `C MPI`**, esquema de 10 columnas (DEC-13), append-only, **solo rank 0
+  escribe**: `workers = size`; `speedup = T_mpi(1)/T_mpi(P)` (baseline propio P=1, leído con
+  `read_last_time(.., "C MPI", .., required_workers=1, ..)`); `efficiency = speedup/workers`;
+  `speedup_vs_python = T_python_secuencial / T_mpi(P)`.
+
+**Razón**: maximizar la reutilización del código ya validado (mismo AUC garantizado, menos
+superficie de error) y evitar comunicación innecesaria (candidatos regenerables por `seed+k`),
+manteniendo la equivalencia con Fases 1–2 y el esquema de métricas de DEC-13. El uso de `MAXLOC`
+recupera además `best_W` de forma determinista sin re-cómputo.
+
+**Interpretación descartada**: `MPI_Scatter` de candidatos precalculados en root (añade memoria
+y comunicación que DEC-12 hace innecesarias); `MPI_MAX` sobre `best_auc` sin transportar `k*`
+(ambiguo para reconstruir `best_W`); reescribir/abstraer el cómputo en vez de copiarlo literal
+(arriesga divergencia de AUC); medir tiempo sin `MPI_Barrier` previo (mezcla desfase de arranque
+con cómputo).

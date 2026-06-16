@@ -45,14 +45,35 @@ lost (solo "possibly lost"/"still reachable" internos de `libgomp`, no atribuibl
 propio). Detalle completo: `context/state/current-phase.md` y
 `traceability_data/2026_06_15_14-36.md`.
 
-## Fase 3 — C + MPI `[PENDIENTE]`
+## Fase 3 — C + MPI `[PLANIFICADA — 2026-06-15]`
 
-Objetivo: paralelismo de memoria distribuida.
+Objetivo: paralelismo de memoria distribuida sobre CPU.
 
-- [ ] Implementar `MPI_Scatter` de candidatos desde root.
-- [ ] Implementar evaluación local y `MPI_Reduce(MPI_MAX)`.
-- [ ] Validar equivalencia AUC.
-- [ ] Medir speedup con P ∈ {1, 2, 4, 8} procesos.
+Plan técnico detallado y tareas concretas: ver `context/state/active-tasks.md` (definido
+2026-06-15, `traceability_data/2026_06_15_19-22.md`) y `context/project/decisions.md#DEC-14`.
+Reutiliza `npy_io.{h,c}` sin cambios y **copia literalmente** el cómputo de `scoring_openmp.c`;
+solo cambia el modelo de paralelismo (procesos MPI). Resumen ordenado:
+
+- [ ] Ajustar `code/C_OpenMP_MPI/Makefile`: target `scoring_mpi` debe linkear `npy_io.c`
+      (`mpicc -O2 -Wall -Wextra -o scoring_mpi scoring_mpi.c npy_io.c -lm`).
+- [ ] Reescribir `scoring_mpi.c` (< 400 LOC): copias literales de RNG SplitMix64, score/AUC con
+      empates, consistencia, `self_test`, `load_dataset`, `read_last_time`/`append_benchmark`.
+- [ ] Carga solo en root (`load_dataset`) + difusión `MPI_Bcast` de `n_items`/`A`/`profiles`/
+      `labels` (DEC-06/10/14), fuera del cronómetro.
+- [ ] Candidatos por **regeneración local** `sample_dirichlet(seed+k)` con `k` global, **sin
+      `MPI_Scatter`** (DEC-14): determinismo y equivalencia con Fases 1–2.
+- [ ] Distribución contiguo por bloques `[r·local_K, (r+1)·local_K)` (último rank absorbe
+      remanente); evaluación independiente sin comunicación durante la búsqueda.
+- [ ] Reducción `MPI_Reduce` con `MPI_MAXLOC`/`MPI_DOUBLE_INT` (transporta `best_auc` + `k*`);
+      root reconstruye `best_W = sample_dirichlet(seed+k*)`.
+- [ ] Timing `MPI_Wtime` con `MPI_Barrier` antes de `t0` (excluye carga); solo rank 0 registra.
+- [ ] CLI `--n-items/--k-candidates/--seed/--self-test` (sin `--threads`; P = `mpirun -n P`).
+- [ ] Registro `C MPI` en `results/benchmark.csv` (10 columnas, append-only, DEC-13; solo rank 0):
+      `speedup = T_mpi(1)/T_mpi(P)`, `efficiency = speedup/workers`,
+      `speedup_vs_python = T_python_secuencial/T_mpi(P)`.
+- [ ] Validar equivalencia AUC (`--self-test` + `|ΔAUC| < 1e-4` vs Python secuencial).
+- [ ] Medir speedup con P ∈ {1, 2, 4, 8} procesos (objetivo `≥ 3×` con P=4, RNF-03); si RIESGO-05
+      se materializa con K=100k, aportar curva K∈{500k,1M}.
 
 ## Fase 4 — CUDA (notebook en Google Colab) `[PENDIENTE]`
 

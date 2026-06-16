@@ -83,6 +83,14 @@ secuencial").
 
 ## Próxima acción
 
-Fase 3 — C + MPI (`scoring_mpi.c`): `MPI_Scatter` de candidatos desde root, evaluación local,
-`MPI_Reduce(MPI_MAX)`, validar equivalencia AUC y medir speedup con P ∈ {1,2,4,8} procesos.
-`npy_io.{h,c}` ya está listo para reutilizarse sin cambios (DEC-12).
+Fase 3 — C + MPI (`scoring_mpi.c`): **plan técnico definido** (2026-06-15,
+`traceability_data/2026_06_15_19-22.md`, formalizado en `context/project/decisions.md#DEC-14` y
+`context/state/active-tasks.md`). **Pendiente de implementación**.
+
+Estrategia (DEC-14): reutilizar `npy_io.{h,c}` sin cambios y **copiar literalmente** el cómputo
+de `scoring_openmp.c`; carga solo en root + `MPI_Bcast`; candidatos por **regeneración local**
+`sample_dirichlet(seed+k)` (sin `MPI_Scatter`, DEC-12); reparto contiguo por bloques; reducción
+`MPI_Reduce` con `MPI_MAXLOC`/`MPI_DOUBLE_INT` (transporta `k*`); timing `MPI_Wtime` con
+`MPI_Barrier` previo; CLI sin `--threads`; registro `C MPI` en `benchmark.csv` (10 cols, solo
+rank 0). Criterios de salida y barrido P∈{1,2,4,8} (+ K∈{500k,1M} si RIESGO-05) en
+`active-tasks.md` §11–§13.
