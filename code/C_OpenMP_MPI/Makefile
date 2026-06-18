@@ -4,6 +4,12 @@ CFLAGS  = -O2 -Wall -Wextra
 OMP_FLAGS = -fopenmp
 MPI_FLAGS =
 
+# The MPI compiler wrappers delegate to an underlying C compiler. Conda's MPICH
+# wrapper defaults to x86_64-conda-linux-gnu-cc (often not installed); system
+# OpenMPI uses cc. Force both to $(CC) so the build works in either environment.
+export MPICH_CC = $(CC)
+export OMPI_CC  = $(CC)
+
 .PHONY: all openmp mpi clean
 
 all: scoring_openmp scoring_mpi

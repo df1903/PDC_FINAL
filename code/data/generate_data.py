@@ -45,7 +45,7 @@ DEFAULT_SEED = 42
 # Intensidad de la señal diferencial inyectada en las filas enfermas de A
 # (DEC-11): a mayor valor, mayor sesgo de la concentración Dirichlet hacia
 # los ítems con T/F altos.
-SIGNAL_STRENGTH = 8.0
+SIGNAL_STRENGTH = 8.00
 
 
 def get_data_directory(n_items: int) -> Path:
