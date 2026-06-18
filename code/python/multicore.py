@@ -43,6 +43,11 @@ def random_search_multicore(
     workers: int = cpu_count(),
 ) -> tuple[np.ndarray, float]:
     """Random Search multicore: genera K candidatos una vez y los reparte en `workers`."""
+    if K < workers:
+        print(
+            f"[WARN] K ({K}) < workers ({workers}); reduciendo workers a {K}"
+        )
+        workers = K
     candidates = sample_candidates(K, seed)
     chunks = np.array_split(candidates, workers)
     with Pool(workers) as pool:
