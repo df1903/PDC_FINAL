@@ -1,9 +1,17 @@
-"""Genera gráficas comparativas completas desde results/benchmark.csv."""
+"""Genera gráficas comparativas desde results/benchmark.csv.
+
+Usa TODAS las filas del CSV. Cada configuración (n_items, k_candidates)
+aparece como una serie/línea separada con su etiqueta.
+
+Uso: desde code/
+    uv run python python/plot_benchmark.py
+"""
 
 import csv
+from collections import defaultdict
 from pathlib import Path
 
-import matplotlib.pyplot as plt  # type: ignore
+import matplotlib.pyplot as plt
 
 BENCHMARK_CSV = Path("results") / "benchmark.csv"
 PLOTS_DIR = Path("results") / "plots"
@@ -11,88 +19,90 @@ PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 
 plt.rcParams.update({
     "figure.dpi": 150,
-    "font.size": 11,
+    "font.size": 10,
     "axes.titlesize": 13,
-    "axes.labelsize": 12,
-    "legend.fontsize": 10,
-    "figure.figsize": (8, 5),
+    "axes.labelsize": 11,
+    "legend.fontsize": 8,
+    "figure.figsize": (10, 6),
 })
 
 
-def load_benchmark(path: Path) -> list[dict]:
+def parse_row(row: dict) -> dict | None:
+    try:
+        r = dict(row)
+        r["n_items"] = int(r["n_items"])
+        r["k_candidates"] = int(r["k_candidates"])
+        r["workers"] = int(r["workers"])
+        r["time_seconds"] = float(r["time_seconds"])
+        r["candidates_per_second"] = float(r["candidates_per_second"])
+        r["best_auc"] = float(r["best_auc"])
+        r["speedup"] = float(r["speedup"]) if r["speedup"] else None
+        r["efficiency"] = float(r["efficiency"]) if r["efficiency"] else None
+        r["speedup_vs_python"] = float(r["speedup_vs_python"]) if r["speedup_vs_python"] else None
+        r["cfg"] = f"n={r['n_items']}, K={r['k_candidates']}"
+        return r
+    except (ValueError, KeyError):
+        return None
+
+
+def load_all(path: Path) -> list[dict]:
     rows = []
     with open(path, newline="") as f:
         for row in csv.DictReader(f):
-            row["workers"] = int(row["workers"])
-            row["time_seconds"] = float(row["time_seconds"])
-            row["candidates_per_second"] = float(row["candidates_per_second"])
-            row["best_auc"] = float(row["best_auc"])
-            if row["speedup"]:
-                row["speedup"] = float(row["speedup"])
-            else:
-                row["speedup"] = None
-            if row["efficiency"]:
-                row["efficiency"] = float(row["efficiency"])
-            else:
-                row["efficiency"] = None
-            if row["speedup_vs_python"]:
-                row["speedup_vs_python"] = float(row["speedup_vs_python"])
-            else:
-                row["speedup_vs_python"] = None
-            rows.append(row)
-    return rows
-
-
-def deduplicate(rows: list[dict]) -> list[dict]:
+            r = parse_row(row)
+            if r:
+                rows.append(r)
     seen = {}
     for r in rows:
-        key = (r["implementation"], r["workers"])
+        key = (r["implementation"], r["n_items"], r["k_candidates"], r["workers"])
         seen[key] = r
     return list(seen.values())
 
 
-COLORS = {
+def label_for(r: dict) -> str:
+    return f"{r['implementation']} ({r['cfg']})"
+
+
+IMPL_COLORS = {
     "Python secuencial": "#2E86AB",
     "Python multicore": "#A23B72",
     "C OpenMP": "#F18F01",
     "C MPI": "#C73E1D",
 }
-MARKERS = {
-    "Python secuencial": "o",
-    "Python multicore": "s",
-    "C OpenMP": "^",
-    "C MPI": "D",
-}
-LINESTYLES = {
-    "C OpenMP": "-",
-    "C MPI": "--",
-}
-LABELS = {
-    "Python secuencial": "Python secuencial",
-    "Python multicore": "Python multicore",
-    "C OpenMP": "C + OpenMP",
-    "C MPI": "C + MPI",
-}
+IMPL_MARKERS = {"Python secuencial": "o", "Python multicore": "s", "C OpenMP": "^", "C MPI": "D"}
+IMPL_LS = {"C OpenMP": "-", "C MPI": "--"}
+
+
+def _config_groups(rows: list[dict], impls: list[str]) -> dict:
+    groups = defaultdict(list)
+    for r in rows:
+        if r["implementation"] in impls:
+            groups[(r["implementation"], r["n_items"], r["k_candidates"])].append(r)
+    return groups
 
 
 def plot_speedup_scalability(rows: list[dict]):
     fig, ax = plt.subplots()
-    impls = ["C OpenMP", "C MPI"]
-    for impl in impls:
-        pts = sorted([r for r in rows if r["implementation"] ==
-                     impl and r["speedup"]], key=lambda x: x["workers"])
+    groups = _config_groups(rows, ["C OpenMP", "C MPI"])
+
+    for (impl, n, k), pts in sorted(groups.items()):
+        pts = sorted([p for p in pts if p["speedup"]], key=lambda x: x["workers"])
+        if len(pts) < 2:
+            continue
         ws = [p["workers"] for p in pts]
         sp = [p["speedup"] for p in pts]
-        ax.plot(ws, sp, marker=MARKERS[impl], linestyle=LINESTYLES[impl], color=COLORS[impl],
-                label=LABELS[impl], linewidth=2, markersize=8)
-    ideal = sorted(set(r["workers"]
-                   for r in rows if r["implementation"] in impls))
-    ax.plot(ideal, ideal, "k--", alpha=0.4,
-            label="Speedup ideal", linewidth=1.5)
-    ax.set_xlabel("Número de workers / procesos (P)")
+        lbl = f"{impl} (n={n}, K={k})"
+        ls = IMPL_LS.get(impl, "-")
+        ax.plot(ws, sp, marker=IMPL_MARKERS.get(impl, "o"), linestyle=ls,
+                color=IMPL_COLORS.get(impl, "#333"), label=lbl, linewidth=1.8, markersize=7)
+
+    all_w = sorted(set(p["workers"] for p in rows if p["implementation"] in ("C OpenMP", "C MPI")))
+    if all_w:
+        ax.plot(all_w, all_w, "k--", alpha=0.4, label="Speedup ideal", linewidth=1.5)
+        ax.set_xticks(all_w)
+    ax.set_xlabel("Workers / procesos (P)")
     ax.set_ylabel("Speedup (vs propio P=1)")
     ax.set_title("Escalabilidad: Speedup vs Workers/Procesos")
-    ax.set_xticks(ideal)
     ax.legend()
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
@@ -102,22 +112,27 @@ def plot_speedup_scalability(rows: list[dict]):
 
 def plot_efficiency(rows: list[dict]):
     fig, ax = plt.subplots()
-    impls = ["C OpenMP", "C MPI"]
-    for impl in impls:
-        pts = sorted([r for r in rows if r["implementation"] ==
-                     impl and r["efficiency"]], key=lambda x: x["workers"])
+    groups = _config_groups(rows, ["C OpenMP", "C MPI"])
+
+    for (impl, n, k), pts in sorted(groups.items()):
+        pts = sorted([p for p in pts if p["efficiency"]], key=lambda x: x["workers"])
+        if len(pts) < 2:
+            continue
         ws = [p["workers"] for p in pts]
         ef = [p["efficiency"] for p in pts]
-        ax.plot(ws, ef, marker=MARKERS[impl], linestyle=LINESTYLES[impl], color=COLORS[impl],
-                label=LABELS[impl], linewidth=2, markersize=8)
-    ax.axhline(y=1.0, color="k", linestyle="--",
-               alpha=0.4, label="Eficiencia ideal")
-    ax.set_xlabel("Número de workers / procesos (P)")
+        lbl = f"{impl} (n={n}, K={k})"
+        ls = IMPL_LS.get(impl, "-")
+        ax.plot(ws, ef, marker=IMPL_MARKERS.get(impl, "o"), linestyle=ls,
+                color=IMPL_COLORS.get(impl, "#333"), label=lbl, linewidth=1.8, markersize=7)
+
+    ax.axhline(y=1.0, color="k", linestyle="--", alpha=0.4, label="Eficiencia ideal")
+    all_w = sorted(set(p["workers"] for p in rows if p["implementation"] in ("C OpenMP", "C MPI")))
+    if all_w:
+        ax.set_xticks(all_w)
+    ax.set_xlabel("Workers / procesos (P)")
     ax.set_ylabel("Eficiencia")
     ax.set_title("Eficiencia vs Workers/Procesos")
-    ax.set_xticks(sorted(set(r["workers"]
-                  for r in rows if r["implementation"] in impls)))
-    ax.set_ylim(0, 1.3)
+    ax.set_ylim(0, 1.35)
     ax.legend()
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
@@ -126,51 +141,38 @@ def plot_efficiency(rows: list[dict]):
 
 
 def plot_time_comparison(rows: list[dict]):
-    fig, ax = plt.subplots()
-    impls = ["Python secuencial", "Python multicore", "C OpenMP", "C MPI"]
+    fig, ax = plt.subplots(figsize=(12, 6))
+    all_cfgs = sorted(set((r["implementation"], r["n_items"], r["k_candidates"]) for r in rows))
+    cfgs_done = set()
     labels_display = []
     times = []
-    colors_bar = []
-    for impl in impls:
-        if impl == "Python secuencial":
-            pts = [r for r in rows if r["implementation"] == impl]
-            t = max(r["time_seconds"] for r in pts) if len(
-                pts) > 1 else pts[0]["time_seconds"]
-            labels_display.append(LABELS[impl])
-            times.append(t)
-            colors_bar.append(COLORS[impl])
-        elif impl == "Python multicore":
-            pts = [r for r in rows if r["implementation"] == impl]
-            t = max(r["time_seconds"] for r in pts) if len(
-                pts) > 1 else pts[0]["time_seconds"]
-            labels_display.append(LABELS[impl] + " (4 workers)")
-            times.append(t)
-            colors_bar.append(COLORS[impl])
-        else:
-            for p in [1, 2, 4, 8]:
-                match = [r for r in rows if r["implementation"]
-                         == impl and r["workers"] == p]
-                if match:
-                    labels_display.append(f"{LABELS[impl]} P={p}")
-                    times.append(match[0]["time_seconds"])
-                    colors_bar.append(COLORS[impl])
+    colors = []
+    for impl, n, k in all_cfgs:
+        cfg_key = (impl, n, k)
+        if cfg_key in cfgs_done:
+            continue
+        cfgs_done.add(cfg_key)
+        cfgs_workers = {r["workers"] for r in rows if r["implementation"] == impl and (r["n_items"], r["k_candidates"]) == (n, k)}
+        for w in sorted(cfgs_workers):
+            match = [r for r in rows if r["implementation"] == impl and r["workers"] == w and r["n_items"] == n and r["k_candidates"] == k]
+            if match:
+                labels_display.append(f"{impl}\nn={n} K={k}\nP={w}")
+                times.append(match[0]["time_seconds"])
+                colors.append(IMPL_COLORS.get(impl, "#666"))
 
-    bars = ax.bar(range(len(times)), times, color=colors_bar,
-                  edgecolor="black", linewidth=0.5)
+    bars = ax.bar(range(len(times)), times, color=colors, edgecolor="black", linewidth=0.5)
     ax.set_xticks(range(len(times)))
-    ax.set_xticklabels(labels_display, rotation=45, ha="right", fontsize=9)
+    ax.set_xticklabels(labels_display, rotation=45, ha="right", fontsize=7)
     ax.set_ylabel("Tiempo (segundos)")
-    ax.set_title("Tiempo de ejecución por implementación (escala log)")
+    ax.set_title("Tiempo de ejecución (escala log) — todas las configuraciones")
     ax.set_yscale("log")
     ax.grid(True, alpha=0.3, axis="y")
 
     for bar, t in zip(bars, times):
-        if t < 0.1:
-            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), f"{t:.4f}s",
-                    ha="center", va="bottom", fontsize=7, rotation=45)
-        else:
-            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), f"{t:.2f}s",
-                    ha="center", va="bottom", fontsize=7)
+        va = "top" if t < 0.1 else "bottom"
+        label = f"{t:.4f}s" if t < 0.1 else f"{t:.2f}s"
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), label,
+                ha="center", va=va, fontsize=6, rotation=45)
 
     fig.tight_layout()
     fig.savefig(PLOTS_DIR / "time_comparison.png")
@@ -178,43 +180,33 @@ def plot_time_comparison(rows: list[dict]):
 
 
 def plot_speedup_vs_python(rows: list[dict]):
-    fig, ax = plt.subplots()
-    impls = ["Python multicore", "C OpenMP", "C MPI"]
+    fig, ax = plt.subplots(figsize=(12, 6))
+    impls_order = ["Python multicore", "C OpenMP", "C MPI"]
     labels_display = []
     sp_vs_py = []
-    colors_bar = []
-    for impl in impls:
-        if impl == "Python multicore":
-            pts = [r for r in rows if r["implementation"]
-                   == impl and r["speedup_vs_python"]]
-            t = max(p["speedup_vs_python"] for p in pts) if len(
-                pts) > 1 else pts[0]["speedup_vs_python"]
-            labels_display.append(LABELS[impl] + " (4 workers)")
-            sp_vs_py.append(t)
-            colors_bar.append(COLORS[impl])
-        else:
-            for p in [1, 2, 4, 8]:
-                match = [r for r in rows if r["implementation"] ==
-                         impl and r["workers"] == p and r["speedup_vs_python"]]
+    colors = []
+    for impl in impls_order:
+        cfgs = sorted(set((r["n_items"], r["k_candidates"]) for r in rows if r["implementation"] == impl))
+        for n, k in cfgs:
+            for w in sorted(set(r["workers"] for r in rows if r["implementation"] == impl and r["n_items"] == n and r["k_candidates"] == k)):
+                match = [r for r in rows if r["implementation"] == impl and r["workers"] == w and r["n_items"] == n and r["k_candidates"] == k and r["speedup_vs_python"]]
                 if match:
-                    labels_display.append(f"{LABELS[impl]} P={p}")
+                    labels_display.append(f"{impl} P={w}\nn={n} K={k}")
                     sp_vs_py.append(match[0]["speedup_vs_python"])
-                    colors_bar.append(COLORS[impl])
+                    colors.append(IMPL_COLORS.get(impl, "#666"))
 
-    bars = ax.bar(range(len(sp_vs_py)), sp_vs_py,
-                  color=colors_bar, edgecolor="black", linewidth=0.5)
+    bars = ax.bar(range(len(sp_vs_py)), sp_vs_py, color=colors, edgecolor="black", linewidth=0.5)
     ax.set_xticks(range(len(sp_vs_py)))
-    ax.set_xticklabels(labels_display, rotation=45, ha="right", fontsize=9)
+    ax.set_xticklabels(labels_display, rotation=45, ha="right", fontsize=7)
     ax.set_ylabel("Speedup vs Python secuencial (×)")
-    ax.set_title("Aceleración vs Python secuencial (escala log)")
+    ax.set_title("Aceleración vs Python secuencial — todas las configuraciones")
     ax.set_yscale("log")
     ax.grid(True, alpha=0.3, axis="y")
 
     for bar, t in zip(bars, sp_vs_py):
-        label = f"{t:.0f}×" if t > 100 else (
-            f"{t:.2f}×" if t >= 1 else f"{t:.3f}×")
+        label = f"{t:.0f}×" if t > 100 else (f"{t:.2f}×" if t >= 1 else f"{t:.3f}×")
         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), label,
-                ha="center", va="bottom", fontsize=7, rotation=45)
+                ha="center", va="bottom", fontsize=6, rotation=45)
 
     fig.tight_layout()
     fig.savefig(PLOTS_DIR / "speedup_vs_python.png")
@@ -223,30 +215,32 @@ def plot_speedup_vs_python(rows: list[dict]):
 
 def plot_throughput(rows: list[dict]):
     fig, ax = plt.subplots()
-    impls = ["C OpenMP", "C MPI"]
-    for impl in impls:
-        pts = sorted([r for r in rows if r["implementation"]
-                     == impl], key=lambda x: x["workers"])
+    groups = _config_groups(rows, ["C OpenMP", "C MPI"])
+
+    for (impl, n, k), pts in sorted(groups.items()):
+        pts = sorted(pts, key=lambda x: x["workers"])
         ws = [p["workers"] for p in pts]
         cps = [p["candidates_per_second"] / 1e6 for p in pts]
-        ax.plot(ws, cps, marker=MARKERS[impl], linestyle=LINESTYLES[impl], color=COLORS[impl],
-                label=LABELS[impl], linewidth=2, markersize=8)
+        lbl = f"{impl} (n={n}, K={k})"
+        ls = IMPL_LS.get(impl, "-")
+        ax.plot(ws, cps, marker=IMPL_MARKERS.get(impl, "o"), linestyle=ls,
+                color=IMPL_COLORS.get(impl, "#333"), label=lbl, linewidth=1.8, markersize=7)
 
-    py_pts = [r for r in rows if r["implementation"] == "Python secuencial"]
-    if py_pts:
-        ax.axhline(y=py_pts[0]["candidates_per_second"] / 1e6, color=COLORS["Python secuencial"],
-                   linestyle=":", alpha=0.7, label=f"Python secuencial ({py_pts[0]['candidates_per_second']/1e6:.0f}M)")
-    py_mc = [r for r in rows if r["implementation"] == "Python multicore"]
-    if py_mc:
-        ax.axhline(y=max(p["candidates_per_second"] for p in py_mc) / 1e6, color=COLORS["Python multicore"],
-                   linestyle=":", alpha=0.7, label=f"Python multicore ({max(p['candidates_per_second'] for p in py_mc)/1e6:.0f}M)")
+    for impl_name, color_key in [("Python secuencial", "Python secuencial"), ("Python multicore", "Python multicore")]:
+        vals = [r["candidates_per_second"] for r in rows if r["implementation"] == impl_name]
+        if vals:
+            val = max(vals)
+            ax.axhline(y=val / 1e6, color=IMPL_COLORS.get(color_key, "#666"),
+                       linestyle=":", alpha=0.7,
+                       label=f"{impl_name} ({val/1e6:.1f}M/s máx)")
 
-    ax.set_xlabel("Número de workers / procesos (P)")
+    all_w = sorted(set(p["workers"] for p in rows if p["implementation"] in ("C OpenMP", "C MPI")))
+    if all_w:
+        ax.set_xticks(all_w)
+    ax.set_xlabel("Workers / procesos (P)")
     ax.set_ylabel("Candidatos por segundo (millones)")
     ax.set_title("Rendimiento: candidatos evaluados por segundo")
-    ax.set_xticks(sorted(set(r["workers"]
-                  for r in rows if r["implementation"] in impls)))
-    ax.legend()
+    ax.legend(fontsize=7)
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(PLOTS_DIR / "throughput.png")
@@ -254,63 +248,63 @@ def plot_throughput(rows: list[dict]):
 
 
 def plot_summary_table(rows: list[dict]):
-    fig, ax = plt.subplots(figsize=(10, 5))
+    configs = sorted(set((r["implementation"], r["n_items"], r["k_candidates"]) for r in rows))
+    table_data = []
+    col_labels = ["Implementación", "N", "K", "Workers", "AUC", "T (s)", "Speedup", "Efic.", "×Py"]
+    for impl, n, k in configs:
+        fs = sorted(set(r["workers"] for r in rows if r["implementation"] == impl and r["n_items"] == n and r["k_candidates"] == k))
+        for w in fs:
+            match = [r for r in rows if r["implementation"] == impl and r["workers"] == w and r["n_items"] == n and r["k_candidates"] == k]
+            if not match:
+                continue
+            r = match[0]
+            sp = f"{r['speedup']:.2f}" if r.get("speedup") else "—"
+            ef = f"{r['efficiency']:.2f}" if r.get("efficiency") else "—"
+            vp = f"{r['speedup_vs_python']:.0f}" if r.get("speedup_vs_python") else "—"
+            table_data.append([
+                impl, str(n), str(k), str(w),
+                f"{r['best_auc']:.4f}", f"{r['time_seconds']:.6f}",
+                sp, ef, vp,
+            ])
+
+    if not table_data:
+        return
+
+    nrows = len(table_data) + 1
+    fig, ax = plt.subplots(figsize=(12, 0.4 * nrows + 1))
     ax.axis("off")
 
-    impls = [
-        ("Python secuencial", 1),
-        ("Python multicore", 4),
-    ]
-    for impl_name in ["C OpenMP", "C MPI"]:
-        for p in [1, 2, 4, 8]:
-            impls.append((impl_name, p))
-
-    table_data = []
-    col_labels = ["Implementación", "Workers", "AUC",
-                  "Tiempo (s)", "Speedup", "Eficiencia", "× vs Python"]
-    for impl, w in impls:
-        match = [r for r in rows if r["implementation"]
-                 == impl and r["workers"] == w]
-        if not match:
-            continue
-        r = match[0]
-        sp = f"{r['speedup']:.2f}×" if r.get("speedup") else "—"
-        ef = f"{r['efficiency']:.2f}" if r.get("efficiency") else "—"
-        vp = f"{r['speedup_vs_python']:.1f}×" if r.get(
-            "speedup_vs_python") else "—"
-        label = LABELS.get(impl, impl)
-        table_data.append(
-            [label, str(w), f"{r['best_auc']:.4f}", f"{r['time_seconds']:.6f}", sp, ef, vp])
-
     table = ax.table(cellText=table_data, colLabels=col_labels,
-                     loc="center", cellLoc="center")
+                     loc="center", cellLoc="center", rowLoc="center")
     table.auto_set_font_size(False)
-    table.set_fontsize(9)
-    table.scale(1, 1.4)
+    table.set_fontsize(8)
+    table.scale(1, 1.3)
 
     for (row, col), cell in table.get_celld().items():
         if row == 0:
             cell.set_facecolor("#2E86AB")
             cell.set_text_props(color="white", fontweight="bold")
-        elif row < 3:
-            cell.set_facecolor("#E8F4F8")
-        elif row < 7:
-            cell.set_facecolor("#FFF3E0")
-        else:
-            cell.set_facecolor("#FBE9E7")
+        elif row % 2 == 0:
+            cell.set_facecolor("#f5f5f5")
 
-    ax.set_title("Resumen comparativo de todas las implementaciones",
-                 fontsize=13, fontweight="bold", pad=20)
+    ax.set_title("Resumen completo de benchmarks", fontsize=13, fontweight="bold", pad=20)
     fig.tight_layout()
     fig.savefig(PLOTS_DIR / "summary_table.png")
     plt.close(fig)
 
 
 def main():
-    rows = load_benchmark(BENCHMARK_CSV)
-    rows = deduplicate(rows)
-    print(
-        f"Generando gráficas desde {len(rows)} filas únicas de benchmark.csv")
+    rows = load_all(BENCHMARK_CSV)
+    if not rows:
+        print("[ERROR] No se encontraron filas válidas en benchmark.csv")
+        return
+
+    configs = sorted(set((r["implementation"], r["n_items"], r["k_candidates"]) for r in rows))
+    print(f"Total filas únicas: {len(rows)}")
+    print(f"Configuraciones encontradas: {len(configs)}")
+    for impl, n, k in configs:
+        ws = sorted(set(r["workers"] for r in rows if r["implementation"] == impl and r["n_items"] == n and r["k_candidates"] == k))
+        print(f"  {impl}: n={n}, K={k}, workers={ws}")
 
     plot_speedup_scalability(rows)
     print("  ✓ speedup_scalability.png")

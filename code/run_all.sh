@@ -103,6 +103,15 @@ step "[09] Generando graficas"
 uv run $PLOTS
 ok "Graficas en results/plots/"
 
+step "[10] Copiando graficas a Windows"
+WINDOWS_PLOTS="/mnt/c/Users/julia/Desktop/PDC_FINAL/PDC_FINAL/code/results/plots/"
+if [ -d "$WINDOWS_PLOTS" ]; then
+    cp results/plots/*.png "$WINDOWS_PLOTS"
+    ok "Graficas copiadas a Windows"
+else
+    echo "  [INFO] Ruta Windows no disponible; graficas solo en WSL"
+fi
+
 # ---- Resumen ----
 echo ""
 echo "================================================"
