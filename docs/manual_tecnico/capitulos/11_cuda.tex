@@ -1,0 +1,303 @@
+\chapter{Implementación CUDA mediante PyCUDA}
+
+La implementación basada en GPU explota el paralelismo masivo disponible en dispositivos NVIDIA compatibles con CUDA mediante la biblioteca PyCUDA. Su objetivo es acelerar la evaluación del espacio de búsqueda distribuyendo miles de candidatos entre los núcleos de procesamiento de la GPU.
+
+A diferencia de las implementaciones secuenciales, multicore, OpenMP y MPI, esta versión aprovecha arquitecturas de procesamiento masivamente paralelas, permitiendo ejecutar simultáneamente una gran cantidad de evaluaciones independientes del algoritmo de optimización.
+
+El código fuente principal se encuentra en:
+
+\begin{center}
+\texttt{code/CUDA/scoring\_pycuda.py}
+\end{center}
+
+El kernel CUDA utilizado para la evaluación paralela se encuentra en:
+
+\begin{center}
+\texttt{code/CUDA/scoring\_kernel.cu}
+\end{center}
+
+\section{Objetivo}
+
+El propósito de esta implementación es paralelizar masivamente la evaluación de candidatos utilizando los miles de núcleos disponibles en una GPU moderna.
+
+Cada hilo CUDA evalúa uno o varios candidatos generados durante la búsqueda aleatoria, manteniendo exactamente la misma lógica matemática empleada por las versiones secuencial, multicore, OpenMP y MPI.
+
+Los resultados obtenidos deben coincidir con la línea base funcional, variando únicamente el tiempo requerido para explorar el espacio de búsqueda.
+
+\section{Descripción General}
+
+Las GPU están diseñadas para ejecutar miles de hilos simultáneamente, lo que resulta especialmente útil para problemas con un alto grado de paralelismo de datos.
+
+En este proyecto, cada candidato generado mediante la distribución de Dirichlet puede evaluarse de forma completamente independiente, lo que convierte el problema en un escenario ideal para la ejecución sobre GPU.
+
+La estrategia implementada consiste en:
+
+\begin{enumerate}
+    \item Transferir el conjunto de datos a la memoria de la GPU.
+    \item Distribuir los candidatos entre miles de hilos CUDA.
+    \item Evaluar simultáneamente los candidatos.
+    \item Aplicar una reducción paralela para encontrar el mejor resultado.
+    \item Transferir únicamente la mejor solución al host.
+\end{enumerate}
+
+\section{Modelo de Ejecución CUDA}
+
+CUDA organiza la ejecución mediante una jerarquía compuesta por tres niveles:
+
+\begin{itemize}
+    \item \textbf{Grid}
+    \item \textbf{Blocks}
+    \item \textbf{Threads}
+\end{itemize}
+
+Cada Grid contiene múltiples bloques y cada bloque contiene múltiples hilos.
+
+La distribución de trabajo utilizada en el proyecto asigna uno o varios candidatos a cada hilo CUDA.
+
+Esta organización permite explotar simultáneamente miles de unidades de procesamiento disponibles en la GPU.
+
+\section{Configuración del Kernel CUDA}
+
+La configuración del kernel fue seleccionada buscando un equilibrio entre ocupación de la GPU y utilización eficiente de los recursos disponibles.
+
+Se emplea:
+
+\begin{lstlisting}[language=C]
+#define BLOCK_SIZE 256
+\end{lstlisting}
+
+Cada bloque contiene 256 hilos, valor ampliamente utilizado debido a que coincide adecuadamente con la organización interna de los Streaming Multiprocessors (SM) de las arquitecturas CUDA modernas.
+
+El número de bloques se calcula dinámicamente mediante:
+
+\[
+GridSize=
+\left\lceil
+\frac{N_{candidatos}}
+{BLOCK\_SIZE}
+\right\rceil
+\]
+
+donde:
+
+\begin{itemize}
+    \item $N_{candidatos}$ representa el número total de candidatos.
+    \item $BLOCK\_SIZE = 256$.
+\end{itemize}
+
+La configuración de lanzamiento puede expresarse como:
+
+\begin{lstlisting}[language=Python]
+block = (256,1,1)
+
+grid = (
+    (num_candidates + 255)//256,
+    1
+)
+\end{lstlisting}
+
+Esta estrategia garantiza que todos los candidatos sean procesados independientemente del tamaño del problema.
+
+\section{Uso de Memoria Compartida}
+
+La memoria compartida (\texttt{shared memory}) permite intercambiar información entre los hilos de un mismo bloque con una latencia significativamente menor que la memoria global.
+
+Durante la ejecución se utiliza memoria compartida para:
+
+\begin{itemize}
+    \item almacenar resultados parciales;
+    \item realizar reducciones locales;
+    \item minimizar accesos repetidos a memoria global.
+\end{itemize}
+
+La utilización de memoria compartida reduce el tráfico de memoria y mejora el rendimiento general del kernel.
+
+\section{Reducción Paralela del Mejor Resultado}
+
+Después de evaluar los candidatos, cada hilo produce un valor de ROC-AUC asociado a la solución evaluada.
+
+La búsqueda del mejor candidato se realiza mediante una reducción paralela.
+
+El procedimiento sigue las siguientes etapas:
+
+\begin{enumerate}
+    \item Cada hilo calcula su ROC-AUC local.
+    \item Cada bloque identifica su mejor resultado local.
+    \item Los mejores resultados de cada bloque se almacenan en memoria global.
+    \item El host realiza una reducción final para obtener el mejor ROC-AUC global.
+\end{enumerate}
+
+Esta estrategia evita transferir todos los resultados generados por la GPU y reduce significativamente el volumen de comunicación entre dispositivo y CPU.
+
+\section{Modelo Conceptual}
+
+\begin{figure}[H]
+\centering
+
+\fbox{
+\parbox[c][8cm][c]{0.85\textwidth}{
+
+\centering
+
+GRID
+
+\vspace{0.4cm}
+
+BLOCK 1
+
+BLOCK 2
+
+BLOCK 3
+
+\vspace{0.4cm}
+
+THREADS
+
+}}
+\caption{Jerarquía de ejecución CUDA.}
+\end{figure}
+
+\section{Flujo General}
+
+La Figura anterior resume el esquema general de ejecución.
+
+El procesamiento sigue las siguientes etapas:
+
+\begin{enumerate}
+    \item Cargar el conjunto de datos.
+    \item Reservar memoria en GPU.
+    \item Transferir datos Host$\rightarrow$Device.
+    \item Configurar Grid y Blocks.
+    \item Lanzar el kernel CUDA.
+    \item Realizar reducción paralela.
+    \item Transferir el mejor resultado Device$\rightarrow$Host.
+    \item Registrar métricas experimentales.
+\end{enumerate}
+
+\section{Pseudocódigo}
+
+\begin{lstlisting}[language=Python]
+copiar_datos_gpu()
+
+configurar_grid()
+
+lanzar_kernel()
+
+reduccion_paralela()
+
+sincronizar()
+
+copiar_resultados_cpu()
+
+seleccionar_mejor()
+\end{lstlisting}
+
+\section{Transferencias de Memoria}
+
+El desempeño global depende significativamente del costo asociado a las transferencias entre CPU y GPU.
+
+Se distinguen dos operaciones principales:
+
+\begin{itemize}
+    \item Host $\rightarrow$ Device.
+    \item Device $\rightarrow$ Host.
+\end{itemize}
+
+Con el fin de minimizar el overhead de comunicación, la matriz de datos y el conjunto de etiquetas son transferidos una única vez al inicio de la ejecución.
+
+Posteriormente, todas las evaluaciones de candidatos se realizan directamente sobre la memoria de la GPU.
+
+Únicamente el mejor resultado encontrado es transferido nuevamente al host al finalizar el procesamiento.
+
+Esta estrategia reduce significativamente el costo asociado a las comunicaciones PCIe.
+
+\section{Gestión de Memoria}
+
+La implementación utiliza dos espacios de memoria claramente diferenciados:
+
+\begin{itemize}
+    \item Memoria principal del host (CPU).
+    \item Memoria global del dispositivo (GPU).
+\end{itemize}
+
+Los datos experimentales permanecen almacenados en la GPU durante toda la ejecución del algoritmo.
+
+Las estructuras temporales utilizadas durante la evaluación de candidatos son creadas directamente en memoria del dispositivo, evitando copias innecesarias.
+
+Esta organización reduce la cantidad de transferencias Host--Device y mejora la eficiencia general de la implementación.
+
+\section{Complejidad Computacional}
+
+La complejidad teórica del algoritmo continúa siendo:
+
+\[
+O(K \times N \times M)
+\]
+
+donde:
+
+\begin{itemize}
+    \item $K$ representa el número de candidatos.
+    \item $N$ representa el número de características.
+    \item $M$ representa el número de muestras.
+\end{itemize}
+
+Sin embargo, al distribuir las evaluaciones entre miles de hilos CUDA, el tiempo efectivo de ejecución puede reducirse considerablemente dependiendo del tamaño del problema y de las características del dispositivo utilizado.
+
+\section{Ventajas}
+
+\begin{itemize}
+    \item Paralelismo masivo.
+    \item Excelente escalabilidad para grandes cantidades de candidatos.
+    \item Aprovechamiento eficiente de arquitecturas GPU.
+    \item Reducción significativa del tiempo de ejecución.
+    \item Conservación exacta de la lógica matemática del algoritmo.
+\end{itemize}
+
+\section{Limitaciones}
+
+\begin{itemize}
+    \item Dependencia de hardware NVIDIA compatible.
+    \item Complejidad de desarrollo superior a OpenMP y MPI.
+    \item Costos asociados a las transferencias de memoria.
+    \item Rendimiento limitado para problemas de tamaño reducido.
+\end{itemize}
+
+\section{Evidencias}
+
+\begin{figure}[H]
+\centering
+\fbox{
+\parbox[c][8cm][c]{0.85\textwidth}{
+\centering
+Insertar captura del dispositivo GPU utilizado.
+}}
+\caption{Información del dispositivo CUDA.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\fbox{
+\parbox[c][8cm][c]{0.85\textwidth}{
+\centering
+Insertar captura de ejecución PyCUDA.
+}}
+\caption{Resultados experimentales CUDA.}
+\end{figure}
+
+\section{Configuración Experimental Recomendada}
+
+Durante la ejecución de los experimentos se recomienda registrar:
+
+\begin{itemize}
+    \item Modelo de GPU.
+    \item Memoria global disponible.
+    \item Número de CUDA Cores.
+    \item Frecuencia del dispositivo.
+    \item Versión de CUDA Toolkit.
+    \item Versión de PyCUDA.
+    \item Tamaño de bloque utilizado.
+    \item Tiempo total de ejecución.
+\end{itemize}
+
+Esta información permite contextualizar adecuadamente los resultados obtenidos y facilita la reproducción de los experimentos en diferentes plataformas.

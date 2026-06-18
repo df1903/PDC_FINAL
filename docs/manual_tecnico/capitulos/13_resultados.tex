@@ -1,0 +1,113 @@
+\chapter{Resultados Experimentales}
+
+Este capítulo presenta los resultados obtenidos durante la ejecución de las diferentes implementaciones desarrolladas para resolver el problema de optimización del score mediante búsqueda aleatoria sobre el simplex.
+
+Su propósito es comparar el comportamiento de cada estrategia de paralelización, evaluar la calidad de las soluciones encontradas y analizar las ventajas y limitaciones observadas durante la experimentación.
+
+\section{Comparación General}
+
+La Tabla \ref{tab:comparacion_general} resume los principales indicadores obtenidos durante la ejecución de cada implementación.
+
+\begin{table}[H]
+\centering
+\caption{Comparación general entre implementaciones}
+\label{tab:comparacion_general}
+\begin{tabular}{lcccc}
+\toprule
+Implementación & Tiempo (s) & Speedup & Eficiencia & ROC-AUC \\
+\midrule
+Secuencial & & -- & -- & \\
+Multicore & & & & \\
+OpenMP & & & & \\
+MPI & & & & \\
+CUDA & & & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La comparación permite analizar simultáneamente la calidad de la solución obtenida y el desempeño computacional alcanzado por cada estrategia de ejecución.
+
+\section{Análisis Comparativo}
+
+A partir de los resultados experimentales se recomienda discutir los siguientes aspectos:
+
+\begin{itemize}
+    \item Diferencias observadas en los tiempos de ejecución.
+    \item Impacto del overhead de comunicación y sincronización.
+    \item Consistencia del ROC-AUC obtenido.
+    \item Comportamiento de las distintas estrategias de paralelización.
+    \item Escalabilidad observada al incrementar los recursos disponibles.
+    \item Relación entre speedup teórico y speedup observado.
+\end{itemize}
+
+Es importante verificar que todas las implementaciones produzcan soluciones equivalentes desde el punto de vista matemático, garantizando que las diferencias observadas correspondan únicamente al tiempo de ejecución y no a errores de cálculo.
+
+\section{CPU vs GPU}
+
+La comparación entre las implementaciones basadas en CPU y GPU permite identificar los beneficios reales del paralelismo masivo.
+
+Los siguientes aspectos deben ser analizados:
+
+\begin{itemize}
+    \item Ventajas del procesamiento mediante miles de hilos CUDA.
+    \item Costos asociados a las transferencias Host--Device.
+    \item Impacto del tamaño del problema sobre el rendimiento.
+    \item Nivel de utilización de los recursos disponibles.
+    \item Situaciones en las cuales la GPU ofrece ventajas significativas respecto a CPU.
+\end{itemize}
+
+En problemas de tamaño reducido, el costo de transferencia puede limitar los beneficios obtenidos mediante GPU. Sin embargo, a medida que aumenta el número de candidatos evaluados, la aceleración proporcionada por CUDA suele superar ampliamente las alternativas basadas exclusivamente en CPU.
+
+\section{Discusión}
+
+Los resultados obtenidos deben interpretarse considerando tanto la calidad de la solución encontrada como el costo computacional asociado.
+
+Aspectos relevantes para la discusión incluyen:
+
+\begin{itemize}
+    \item Balance entre rendimiento y complejidad de implementación.
+    \item Facilidad de escalamiento de cada estrategia.
+    \item Costos de sincronización y comunicación.
+    \item Limitaciones observadas durante la experimentación.
+    \item Reproducibilidad de los resultados.
+\end{itemize}
+
+Asimismo, resulta importante analizar si el incremento en complejidad técnica introducido por MPI o CUDA se traduce en mejoras significativas respecto a OpenMP o multiprocessing.
+
+\section{Separabilidad de las Clases mediante el Score Óptimo}
+
+Uno de los objetivos fundamentales del proyecto consiste en encontrar un conjunto de pesos capaz de maximizar la capacidad discriminativa del score construido a partir de las características disponibles.
+
+La calidad de dicha separación se evalúa mediante la métrica ROC-AUC.
+
+Recordando lo presentado en el Capítulo 3:
+
+\[
+0.5 \le ROC\text{-}AUC \le 1.0
+\]
+
+donde:
+
+\begin{itemize}
+    \item \(ROC\text{-}AUC = 0.5\) indica ausencia de capacidad discriminativa.
+    \item \(ROC\text{-}AUC > 0.8\) indica una solución consistente.
+    \item \(ROC\text{-}AUC \rightarrow 1\) representa una separación casi perfecta entre clases.
+\end{itemize}
+
+Cuando el algoritmo encuentra un conjunto de pesos óptimo, los individuos pertenecientes a grupos diferentes tienden a ubicarse en regiones distintas del espacio de puntuación generado por el score.
+
+En consecuencia, la distribución de valores obtenidos para cada grupo presenta un menor grado de superposición, facilitando la clasificación y mejorando la capacidad predictiva del modelo.
+
+La Figura correspondiente puede complementarse mediante histogramas, diagramas de densidad o curvas ROC construidas a partir de la mejor solución encontrada.
+
+\begin{figure}[H]
+\centering
+\fbox{
+\parbox[c][8cm][c]{0.85\textwidth}{
+\centering
+Insertar gráfica de separación entre clases utilizando el score óptimo.
+}}
+\caption{Separabilidad de las clases mediante el score óptimo encontrado.}
+\end{figure}
+
+Esta evidencia permite verificar visualmente que la función objetivo definida en el proyecto logra maximizar la capacidad discriminativa del score construido y constituye una validación adicional de la calidad de la solución obtenida.

@@ -1,9 +1,103 @@
-\documentclass{article}
+\documentclass[12pt,letterpaper,oneside]{report}
+
+\usepackage[spanish,es-nodecimaldot]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+
+\usepackage{geometry}
+\geometry{
+    left=3cm,
+    right=2.5cm,
+    top=3cm,
+    bottom=2.5cm
+}
+
+
+\usepackage{amsmath,amssymb,amsfonts}
+
+
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{longtable}
+
+
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{codegray}{RGB}{245,245,245}
+\definecolor{commentgreen}{RGB}{0,120,0}
+
+\lstset{
+    backgroundcolor=\color{codegray},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+    commentstyle=\color{commentgreen},
+    keywordstyle=\bfseries,
+    showstringspaces=false,
+    tabsize=4
+}
+
+
+\usepackage[hidelinks]{hyperref}
+
+
+\usepackage[
+backend=biber,
+style=ieee
+]{biblatex}
+
+\addbibresource{referencias.bib}
+
+
+\usepackage{titlesec}
+
+\titleformat{\chapter}[display]
+{\bfseries\Large}
+{\chaptertitlename\ \thechapter}
+{20pt}
+{\Huge}
+
+
 \begin{document}
 
-\title{Manual Técnico}
-\maketitle
+\input{portada}
 
-\input{sections/contenido}
+\pagenumbering{roman}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\clearpage
+\pagenumbering{arabic}
+
+\input{capitulos/01_introduccion}
+\input{capitulos/02_objetivos}
+\input{capitulos/03_fundamentos}
+\input{capitulos/04_arquitectura}
+\input{capitulos/05_estructura_repositorio}
+\input{capitulos/06_generacion_datos}
+\input{capitulos/07_secuencial}
+\input{capitulos/08_multicore}
+\input{capitulos/09_openmp}
+\input{capitulos/10_mpi}
+\input{capitulos/11_cuda}
+\input{capitulos/12_pruebas}
+\input{capitulos/13_resultados}
+\input{capitulos/14_limitaciones}
+\input{capitulos/15_trabajo_futuro}
+\input{capitulos/16_conclusiones}
+\input{capitulos/anexos}
+
+
+\printbibliography
 
 \end{document}

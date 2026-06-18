@@ -1,0 +1,408 @@
+\chapter{Pruebas y Validación}
+
+El presente capítulo describe la estrategia de validación implementada para garantizar la corrección funcional del algoritmo y evaluar el comportamiento de las diferentes estrategias de paralelización desarrolladas durante el proyecto.
+
+Las pruebas realizadas tuvieron como objetivo verificar que todas las implementaciones produjeran resultados consistentes respecto a la línea base secuencial y que las mejoras en desempeño no afectaran la calidad de la solución encontrada.
+
+Asimismo, se analizaron métricas clásicas de computación paralela tales como speedup, eficiencia y escalabilidad, complementadas con la Ley de Amdahl para estimar el potencial máximo de aceleración del problema.
+
+\section{Metodología de Validación}
+
+La validación se desarrolló siguiendo las siguientes etapas:
+
+\begin{enumerate}
+    \item Verificación funcional de la implementación secuencial.
+    \item Comparación de resultados entre implementaciones.
+    \item Validación de restricciones matemáticas.
+    \item Verificación de consistencia mediante ROC-AUC.
+    \item Evaluación del desempeño computacional.
+    \item Medición de speedup.
+    \item Cálculo de eficiencia.
+    \item Estudio de escalabilidad.
+\end{enumerate}
+
+\section{Entorno Experimental}
+
+Durante la ejecución de las pruebas debe registrarse la configuración del entorno utilizado.
+
+\begin{table}[H]
+\centering
+\caption{Configuración del entorno experimental}
+\begin{tabular}{ll}
+\toprule
+Característica & Especificación \\
+\midrule
+Sistema Operativo & \\
+Procesador & \\
+Núcleos físicos & \\
+Hilos lógicos & \\
+Memoria RAM & \\
+GPU & \\
+Versión Python & \\
+Versión GCC & \\
+Versión OpenMP & \\
+Versión MPI & \\
+Versión CUDA & \\
+Versión PyCUDA & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Los resultados obtenidos deben almacenarse en el archivo:
+
+\begin{center}
+\texttt{results/benchmark.csv}
+\end{center}
+
+Este archivo centraliza las métricas de desempeño generadas por las diferentes implementaciones y facilita la construcción de tablas y gráficas comparativas.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Pruebas Funcionales}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Las pruebas funcionales verifican que todas las implementaciones produzcan resultados correctos desde el punto de vista matemático.
+
+\subsection{Prueba PF-01: Correctitud Secuencial}
+
+\textbf{Objetivo}
+
+Verificar que la implementación secuencial produzca resultados válidos.
+
+\textbf{Procedimiento}
+
+\begin{enumerate}
+    \item Ejecutar la versión secuencial.
+    \item Registrar el mejor ROC-AUC encontrado.
+    \item Registrar el vector de pesos asociado.
+    \item Verificar el cumplimiento de las restricciones del simplex.
+\end{enumerate}
+
+\textbf{Resultado esperado}
+
+\begin{itemize}
+    \item ROC-AUC válido.
+    \item Restricciones satisfechas.
+    \item Solución reproducible utilizando la misma semilla aleatoria.
+\end{itemize}
+
+\textbf{Resultado obtenido}
+
+Completar durante la experimentación.
+
+\begin{figure}[H]
+\centering
+\fbox{
+\parbox[c][8cm][c]{0.85\textwidth}{
+\centering
+Insertar evidencia de ejecución secuencial.
+}}
+\caption{PF-01: Correctitud de la implementación secuencial.}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Prueba PF-02: Equivalencia Multicore}
+
+\textbf{Objetivo}
+
+Comprobar que la implementación multicore produzca resultados equivalentes a la línea base.
+
+\[
+AUC_{multicore}\approx AUC_{secuencial}
+\]
+
+La diferencia observada debe atribuirse únicamente al carácter aleatorio de la exploración y no a errores computacionales.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Prueba PF-03: Equivalencia OpenMP}
+
+\[
+AUC_{OpenMP}\approx AUC_{secuencial}
+\]
+
+El mejor resultado encontrado debe mantenerse dentro del mismo rango de calidad obtenido por la implementación secuencial.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Prueba PF-04: Equivalencia MPI}
+
+\[
+AUC_{MPI}\approx AUC_{secuencial}
+\]
+
+Se verifica que la distribución de candidatos entre procesos no altere la validez matemática de la solución.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Prueba PF-05: Equivalencia CUDA}
+
+\[
+AUC_{CUDA}\approx AUC_{secuencial}
+\]
+
+La aceleración proporcionada por la GPU no debe modificar el resultado final del algoritmo.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Prueba PF-06: Restricciones del Simplex}
+
+\textbf{Objetivo}
+
+Validar que todos los vectores de pesos generados cumplan:
+
+\[
+\sum_{i=1}^{N}W_i=1
+\]
+
+y
+
+\[
+W_i \ge 0
+\]
+
+\textbf{Resultado esperado}
+
+Todos los candidatos deben satisfacer las restricciones del simplex.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Prueba PF-07: Consistencia del Scoring}
+
+Según lo establecido en el Capítulo 3, una solución es considerada consistente cuando:
+
+\[
+ROC\text{-}AUC \ge 0.8
+\]
+
+Esta prueba verifica que los mejores candidatos encontrados alcancen niveles adecuados de discriminación entre las clases analizadas.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Pruebas de Desempeño}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Las pruebas de desempeño buscan cuantificar el impacto de cada estrategia de paralelización.
+
+Cada experimento debe ejecutarse múltiples veces para reducir la influencia de factores externos como carga del sistema operativo, procesos concurrentes o variaciones en la frecuencia del procesador.
+
+\subsection{Tiempo de ejecución}
+
+Registrar el tiempo promedio obtenido.
+
+\begin{table}[H]
+\centering
+\caption{Tiempo promedio de ejecución}
+\begin{tabular}{lccc}
+\toprule
+Implementación & Corrida 1 & Corrida 2 & Promedio (s) \\
+\midrule
+Secuencial & & & \\
+Multicore & & & \\
+OpenMP & & & \\
+MPI & & & \\
+CUDA & & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Speedup}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+El speedup mide la aceleración obtenida respecto a la versión secuencial.
+
+\begin{equation}
+S_p=
+\frac{T_{seq}}
+     {T_p}
+\end{equation}
+
+donde:
+
+\begin{itemize}
+    \item $T_{seq}$ es el tiempo secuencial.
+    \item $T_p$ es el tiempo paralelo.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{Speedup obtenido}
+\begin{tabular}{lc}
+\toprule
+Implementación & Speedup \\
+\midrule
+Multicore & \\
+OpenMP & \\
+MPI & \\
+CUDA & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Eficiencia}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+La eficiencia evalúa qué tan bien son aprovechados los recursos paralelos disponibles.
+
+\begin{equation}
+E_p=
+\frac{S_p}{P}
+\end{equation}
+
+donde:
+
+\begin{itemize}
+    \item $S_p$ es el speedup observado.
+    \item $P$ representa el número de unidades de ejecución.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{Eficiencia obtenida}
+\begin{tabular}{lcc}
+\toprule
+Implementación & Procesadores & Eficiencia \\
+\midrule
+Multicore & & \\
+OpenMP & & \\
+MPI & & \\
+CUDA & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Escalabilidad}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+La escalabilidad mide la capacidad del algoritmo para aprovechar recursos adicionales.
+
+\begin{table}[H]
+\centering
+\caption{Escalabilidad}
+\begin{tabular}{cccc}
+\toprule
+Procesadores & Tiempo (s) & Speedup & Eficiencia \\
+\midrule
+1 & & & \\
+2 & & & \\
+4 & & & \\
+8 & & & \\
+16 & & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Ley de Amdahl}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+La Ley de Amdahl establece un límite teórico para la aceleración máxima alcanzable por una aplicación paralela.
+
+Sea \(f\) la fracción paralelizable del algoritmo y \(P\) el número de procesadores utilizados.
+
+El speedup teórico viene dado por:
+
+\begin{equation}
+S(P)=
+\frac{1}
+     {(1-f)+\frac{f}{P}}
+\end{equation}
+
+Cuando el número de procesadores tiende a infinito:
+
+\[
+\lim_{P\to\infty}S(P)
+=
+\frac{1}{1-f}
+\]
+
+Esto implica que incluso disponiendo de recursos ilimitados, la parte secuencial del algoritmo impone una cota superior al rendimiento alcanzable.
+
+En este proyecto, la evaluación independiente de candidatos permite esperar valores elevados de \(f\), ya que la mayor parte del tiempo de ejecución corresponde a tareas paralelizables.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Estimación Empírica de la Fracción Paralelizable}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+A partir del speedup experimental observado puede estimarse la fracción paralelizable utilizando:
+
+\[
+f=
+\frac{1-\frac{1}{S(P)}}
+     {1-\frac{1}{P}}
+\]
+
+Esta estimación permite cuantificar qué porcentaje del algoritmo realmente se beneficia de la paralelización.
+
+\begin{table}[H]
+\centering
+\caption{Estimación empírica de la fracción paralelizable}
+\begin{tabular}{lccc}
+\toprule
+Implementación & P & Speedup & f \\
+\midrule
+Multicore & & & \\
+OpenMP & & & \\
+MPI & & & \\
+CUDA & & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Valores cercanos a uno indican que la mayor parte del algoritmo puede ejecutarse en paralelo, mientras que valores menores evidencian la presencia de componentes secuenciales significativos.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Gráficas Experimentales}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Las siguientes figuras deberán completarse una vez obtenidos los resultados experimentales.
+
+\begin{figure}[H]
+\centering
+\fbox{
+\parbox[c][7cm][c]{0.85\textwidth}{
+\centering
+Insertar gráfica Tiempo vs Implementación.
+}}
+\caption{Comparación de tiempos de ejecución.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\fbox{
+\parbox[c][7cm][c]{0.85\textwidth}{
+\centering
+Insertar gráfica de Speedup.
+}}
+\caption{Speedup de las implementaciones paralelas.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\fbox{
+\parbox[c][7cm][c]{0.85\textwidth}{
+\centering
+Insertar gráfica de eficiencia.
+}}
+\caption{Eficiencia obtenida.}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Análisis de Resultados}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Una vez diligenciadas las tablas anteriores, deberá realizarse un análisis crítico considerando:
+
+\begin{itemize}
+    \item Diferencias observadas entre las implementaciones.
+    \item Impacto del overhead de comunicación.
+    \item Comportamiento de OpenMP frente a MPI.
+    \item Beneficios obtenidos mediante GPU.
+    \item Relación entre speedup observado y speedup teórico.
+    \item Estimación empírica de la fracción paralelizable.
+    \item Limitaciones identificadas durante la experimentación.
+\end{itemize}
+
+Los hallazgos obtenidos servirán como fundamento para la interpretación de resultados experimentales y las conclusiones finales del proyecto.
