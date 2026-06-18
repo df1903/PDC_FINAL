@@ -64,5 +64,4 @@ code/.logs/
 # Generated reports and plots
 code/report/*
 !code/report/.gitkeep
-code/results/plots/*
 !code/results/plots/.gitkeep
