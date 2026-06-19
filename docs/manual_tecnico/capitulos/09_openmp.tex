@@ -1,10 +1,352 @@
+%=========================================
+% Archivo:
+% capitulos/09_openmp.tex
+%=========================================
+
+\chapter{Implementación OpenMP}
+
+La implementación OpenMP constituye la primera aproximación del proyecto al paradigma de memoria compartida utilizando lenguaje C. A diferencia de las versiones desarrolladas en Python, esta implementación aprovecha las directivas del compilador para distribuir automáticamente el trabajo entre múltiples hilos que comparten el mismo espacio de memoria.
+
+El objetivo principal consiste en acelerar la evaluación del espacio de búsqueda de los candidatos del vector de pesos \(W\), manteniendo exactamente el mismo algoritmo empleado en la implementación secuencial y garantizando la obtención del mismo valor óptimo de ROC-AUC.
+
+El código fuente principal se encuentra en:
+
+\begin{center}
+\texttt{code/C\_OpenMP\_MPI/scoring\_openmp.c}
+\end{center}
+
+%--------------------------------------------------------
+
+\section{Objetivo}
+
+El propósito de esta implementación es paralelizar la evaluación de candidatos utilizando múltiples hilos sobre memoria compartida, manteniendo exactamente la misma lógica de procesamiento que la versión secuencial.
+
+Cada hilo procesa un subconjunto independiente del espacio de búsqueda mientras todos comparten la misma matriz de datos y las estructuras comunes del algoritmo.
+
+Los resultados obtenidos deben coincidir con la línea base, variando únicamente el tiempo de ejecución.
+
+%--------------------------------------------------------
+
+\section{Estrategia de Paralelización}
+
+Dado que la evaluación de cada candidato es completamente independiente del resto, se implementó una estrategia de paralelismo basada en descomposición de iteraciones.
+
+El conjunto de candidatos generado durante la búsqueda aleatoria se divide automáticamente entre los hilos disponibles mediante OpenMP.
+
+Cada hilo:
+
+\begin{itemize}
+
+\item Evalúa un subconjunto del espacio de búsqueda.
+
+\item Calcula localmente el mejor valor de ROC-AUC encontrado.
+
+\item Conserva el vector de pesos asociado a dicho resultado.
+
+\end{itemize}
+
+Finalizada la evaluación local, todos los hilos sincronizan sus resultados para determinar el mejor candidato global.
+
+Esta estrategia permite aprovechar eficientemente arquitecturas multinúcleo sin modificar la lógica matemática del algoritmo original.
+
+%--------------------------------------------------------
+
+\section{Modelo de Ejecución}
+
+La Figura \ref{fig:arquitectura_openmp} muestra el esquema de paralelización implementado.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=.90\textwidth,height=0.45\textheight,keepaspectratio]
+{figuras/implementaciones/05_arquitectura_openmp.png}
+\caption{Arquitectura de la implementación OpenMP.}
+\label{fig:arquitectura_openmp}
+\end{figure}
+
+El funcionamiento puede resumirse de la siguiente manera:
+
+\begin{itemize}
+
+\item El proceso principal inicializa la región paralela.
+
+\item Los candidatos se distribuyen automáticamente entre los hilos disponibles.
+
+\item Cada hilo evalúa sus candidatos de forma independiente.
+
+\item Cada hilo calcula el mejor ROC-AUC local.
+
+\item Se sincronizan los resultados mediante una reducción global.
+
+\item El proceso principal conserva únicamente el mejor candidato encontrado.
+
+\end{itemize}
+
+%--------------------------------------------------------
+
+\section{Flujo de Ejecución}
+
+La Figura \ref{fig:flujo_openmp} resume el flujo seguido durante la ejecución paralela.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=.85\textwidth,height=0.45\textheight,keepaspectratio]
+{figuras/implementaciones/06_flujo_openmp.png}
+\caption{Flujo de ejecución de la implementación OpenMP.}
+\label{fig:flujo_openmp}
+\end{figure}
+
+El procesamiento sigue las siguientes etapas:
+
+\begin{enumerate}
+
+\item Cargar el conjunto de datos.
+
+\item Generar el conjunto de candidatos.
+
+\item Inicializar la región paralela OpenMP.
+
+\item Distribuir automáticamente las iteraciones.
+
+\item Evaluar cada candidato.
+
+\item Calcular el mejor ROC-AUC local.
+
+\item Sincronizar los resultados.
+
+\item Seleccionar el mejor candidato global.
+
+\item Registrar las métricas experimentales.
+
+\end{enumerate}
+
+%--------------------------------------------------------
+
+\section{Directivas Utilizadas}
+
+La implementación hace uso de las principales construcciones ofrecidas por OpenMP para distribuir el trabajo y sincronizar el acceso a los datos compartidos.
+
+\begin{itemize}
+
+\item \texttt{\#pragma omp parallel}
+
+Define una región paralela en la que múltiples hilos ejecutan simultáneamente el mismo bloque de código.
+
+\item \texttt{\#pragma omp for}
+
+Distribuye automáticamente las iteraciones del espacio de búsqueda entre todos los hilos disponibles, permitiendo que cada hilo procese un subconjunto independiente de candidatos.
+
+\item \texttt{\#pragma omp critical}
+
+Protege la actualización del mejor valor global de ROC-AUC evitando condiciones de carrera cuando varios hilos intentan modificar simultáneamente la misma variable compartida.
+
+\item \texttt{reduction(+:variable)}
+
+Permite combinar de forma segura los acumuladores calculados por cada hilo durante la ejecución paralela.
+
+\item Variables privadas y compartidas.
+
+Las variables temporales utilizadas durante la evaluación permanecen privadas para cada hilo, mientras que la matriz de datos, el conjunto de candidatos y el mejor resultado global son compartidos.
+
+\end{itemize}
+
+%--------------------------------------------------------
+
+\section{Pseudocódigo}
+
+El algoritmo implementado puede resumirse mediante el siguiente pseudocódigo.
+
+\begin{lstlisting}[language=C]
+mejor_auc_global = 0;
+
+#pragma omp parallel
+{
+    mejor_auc_local = 0;
+
+    #pragma omp for
+    for(int candidato=0; candidato<K; candidato++)
+    {
+        evaluar_candidato();
+
+        if(auc > mejor_auc_local)
+            actualizar_mejor_local();
+    }
+
+    #pragma omp critical
+    {
+        if(mejor_auc_local > mejor_auc_global)
+            actualizar_mejor_global();
+    }
+}
+\end{lstlisting}
+
+Cada hilo explora una fracción del espacio de búsqueda sin necesidad de comunicación durante el procesamiento. Únicamente al finalizar la evaluación local se sincronizan los resultados para identificar la mejor solución global.
+
+%--------------------------------------------------------
+
+\section{Compilación y Ejecución}
+
+La implementación se compila utilizando:
+
+\begin{lstlisting}[language=bash]
+gcc scoring_openmp.c -fopenmp -O3 -o scoring_openmp
+\end{lstlisting}
+
+La ejecución se realiza mediante:
+
+\begin{lstlisting}[language=bash]
+./scoring_openmp
+\end{lstlisting}
+
+Opcionalmente puede controlarse el número de hilos mediante la variable de entorno:
+
+\begin{lstlisting}[language=bash]
+export OMP_NUM_THREADS=8
+./scoring_openmp
+\end{lstlisting}
+
+%--------------------------------------------------------
+
+\section{Complejidad Computacional}
+
+La complejidad teórica continúa siendo
+
+\[
+O(K \times N \times M)
+\]
+
+donde:
+
+\begin{itemize}
+
+\item \(K\): número de candidatos evaluados.
+
+\item \(N\): número de ítems por muestra.
+
+\item \(M\): número de muestras.
+
+\end{itemize}
+
+Al distribuir el trabajo entre \(T\) hilos, el tiempo efectivo puede aproximarse por
+
+\[
+O\left(
+\frac{K\times N\times M}{T}
+\right)
+\]
+
+descontando el costo de sincronización y la reducción global.
+
+En la práctica el speedup obtenido depende del porcentaje paralelizable del algoritmo y del overhead asociado a la creación y sincronización de hilos.
+
+%--------------------------------------------------------
+
+\section{Estrategia de Sincronización}
+
+Debido a que la evaluación de cada candidato es completamente independiente, la implementación presenta un nivel muy bajo de sincronización.
+
+Durante la mayor parte de la ejecución cada hilo trabaja únicamente sobre variables privadas, eliminando prácticamente la posibilidad de condiciones de carrera.
+
+La sincronización solamente ocurre cuando:
+
+\begin{itemize}
+
+\item Se comparan los mejores resultados locales.
+
+\item Se actualiza el mejor ROC-AUC global.
+
+\item Se combinan acumuladores mediante operaciones de reducción.
+
+\end{itemize}
+
+El uso de regiones críticas únicamente durante la actualización del mejor resultado minimiza el overhead y mejora la escalabilidad en arquitecturas multinúcleo.
+
+%--------------------------------------------------------
+
+\section{Gestión de Memoria}
+
+OpenMP utiliza un modelo de memoria compartida.
+
+Todas las estructuras principales del algoritmo permanecen almacenadas una única vez en memoria principal y son accesibles por todos los hilos.
+
+Entre ellas se encuentran:
+
+\begin{itemize}
+
+\item Matriz de datos.
+
+\item Etiquetas de clasificación.
+
+\item Espacio de búsqueda.
+
+\item Mejor solución global.
+
+\end{itemize}
+
+Por otra parte, cada hilo mantiene variables privadas para almacenar:
+
+\begin{itemize}
+
+\item Mejor ROC-AUC local.
+
+\item Vector de pesos local.
+
+\item Variables temporales de cálculo.
+
+\end{itemize}
+
+Esta organización reduce el consumo de memoria y evita la duplicación innecesaria de datos, característica propia de los modelos de memoria compartida.
+
+%--------------------------------------------------------
+
+\section{Ventajas}
+
+La implementación OpenMP ofrece las siguientes ventajas:
+
+\begin{itemize}
+
+\item Bajo esfuerzo de implementación mediante directivas del compilador.
+
+\item Excelente desempeño en arquitecturas de memoria compartida.
+
+\item Aprovechamiento eficiente de procesadores multinúcleo.
+
+\item Bajo consumo adicional de memoria.
+
+\item Escalabilidad para equipos con múltiples núcleos.
+
+\item Conservación exacta de la lógica utilizada por la versión secuencial.
+
+\end{itemize}
+
+%--------------------------------------------------------
+
+\section{Limitaciones}
+
+Entre las principales limitaciones se encuentran:
+
+\begin{itemize}
+
+\item Restringido a sistemas de memoria compartida.
+
+\item Escalabilidad limitada por el número de núcleos físicos disponibles.
+
+\item Aparición de overhead por sincronización.
+
+\item Posibles regiones críticas costosas cuando aumenta el número de hilos.
+
+\item Menor eficiencia para cargas de trabajo pequeñas.
+
+\end{itemize}
+
+%--------------------------------------------------------
+
 \section{Evidencia Experimental}
 
 La Figura \ref{fig:ejecucion_openmp} presenta una ejecución de muestra de la implementación OpenMP durante los experimentos realizados.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=.95\textwidth, height=0.45\textheight, keepaspectratio]
+\includegraphics[width=.95\textwidth,height=0.45\textheight,keepaspectratio]
 {figuras/capturas/openmp.png}
 \caption{Ejecución de muestra de la implementación OpenMP.}
 \label{fig:ejecucion_openmp}
@@ -16,7 +358,7 @@ Las Figuras \ref{fig:openmp_1t_10} a \ref{fig:openmp_1t_50} presentan los result
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=.95\textwidth, height=0.45\textheight, keepaspectratio]
+\includegraphics[width=.95\textwidth,height=0.45\textheight,keepaspectratio]
 {figuras/capturas/openmp_1t_10.png}
 \caption{OpenMP -- 1 hilo -- 10 ítems metagenómicos.}
 \label{fig:openmp_1t_10}
@@ -24,7 +366,7 @@ Las Figuras \ref{fig:openmp_1t_10} a \ref{fig:openmp_1t_50} presentan los result
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=.95\textwidth, height=0.45\textheight, keepaspectratio]
+\includegraphics[width=.95\textwidth,height=0.45\textheight,keepaspectratio]
 {figuras/capturas/openmp_1t_20.png}
 \caption{OpenMP -- 1 hilo -- 20 ítems metagenómicos.}
 \label{fig:openmp_1t_20}
@@ -32,7 +374,7 @@ Las Figuras \ref{fig:openmp_1t_10} a \ref{fig:openmp_1t_50} presentan los result
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=.95\textwidth, height=0.45\textheight, keepaspectratio]
+\includegraphics[width=.95\textwidth,height=0.45\textheight,keepaspectratio]
 {figuras/capturas/openmp_1t_30.png}
 \caption{OpenMP -- 1 hilo -- 30 ítems metagenómicos.}
 \label{fig:openmp_1t_30}
@@ -40,7 +382,7 @@ Las Figuras \ref{fig:openmp_1t_10} a \ref{fig:openmp_1t_50} presentan los result
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=.95\textwidth, height=0.45\textheight, keepaspectratio]
+\includegraphics[width=.95\textwidth,height=0.45\textheight,keepaspectratio]
 {figuras/capturas/openmp_1t_40.png}
 \caption{OpenMP -- 1 hilo -- 40 ítems metagenómicos.}
 \label{fig:openmp_1t_40}
@@ -48,7 +390,7 @@ Las Figuras \ref{fig:openmp_1t_10} a \ref{fig:openmp_1t_50} presentan los result
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=.95\textwidth, height=0.45\textheight, keepaspectratio]
+\includegraphics[width=.95\textwidth,height=0.45\textheight,keepaspectratio]
 {figuras/capturas/openmp_1t_50.png}
 \caption{OpenMP -- 1 hilo -- 50 ítems metagenómicos.}
 \label{fig:openmp_1t_50}
@@ -60,7 +402,7 @@ Las Figuras \ref{fig:openmp_2t_10} a \ref{fig:openmp_2t_50} presentan los result
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=.95\textwidth, height=0.45\textheight, keepaspectratio]
+\includegraphics[width=.95\textwidth,height=0.45\textheight,keepaspectratio]
 {figuras/capturas/openmp_2t_10.png}
 \caption{OpenMP -- 2 hilos -- 10 ítems metagenómicos.}
 \label{fig:openmp_2t_10}
@@ -68,9 +410,22 @@ Las Figuras \ref{fig:openmp_2t_10} a \ref{fig:openmp_2t_50} presentan los result
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=.95\textwidth, height=0.45\textheight, keepaspectratio]
+\includegraphics[width=.95\textwidth,height=0.45\textheight,keepaspectratio]
 {figuras/capturas/openmp_2t_20.png}
 \caption{OpenMP -- 2 hilos -- 20 ítems metagenómicos.}
 \label{fig:openmp_2t_20}
 \end{figure}
+
 Durante cada prueba se registró automáticamente el tiempo total de procesamiento, el mejor valor de ROC-AUC encontrado y la información correspondiente a los hilos utilizados.
+
+
+
+\section{Comparación con la Implementación Secuencial}
+
+La implementación OpenMP conserva exactamente la misma lógica del algoritmo secuencial, garantizando que el mejor valor de ROC-AUC obtenido sea idéntico en ambas versiones.
+
+La principal diferencia radica en la distribución automática de las iteraciones entre múltiples hilos mediante las directivas del compilador.
+
+Desde el punto de vista del proyecto de Computación de Alto Rendimiento, OpenMP representa la solución orientada a arquitecturas de memoria compartida, donde el paralelismo se obtiene mediante la evaluación concurrente de candidatos sobre múltiples núcleos del procesador.
+
+Esta implementación constituye el primer nivel de paralelización desarrollado en lenguaje C antes de abordar el paradigma de memoria distribuida mediante MPI y la aceleración masiva utilizando GPU con CUDA.

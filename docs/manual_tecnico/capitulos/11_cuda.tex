@@ -62,7 +62,9 @@ La configuración del kernel fue seleccionada buscando un equilibrio entre ocupa
 
 Se emplea:
 
-\begin{lstlisting}[language=C]
+\begin{lstlisting}[language=C,
+caption={Tamaño de bloque utilizado por el kernel CUDA},
+label={lst:block_size}]
 #define BLOCK_SIZE 256
 \end{lstlisting}
 
@@ -87,7 +89,9 @@ donde:
 
 La configuración de lanzamiento puede expresarse como:
 
-\begin{lstlisting}[language=Python]
+\begin{lstlisting}[language=Python,
+caption={Configuración de Grid y Blocks en PyCUDA},
+label={lst:grid_configuration}]
 block = (256,1,1)
 
 grid = (
@@ -105,9 +109,9 @@ La memoria compartida (\texttt{shared memory}) permite intercambiar información
 Durante la ejecución se utiliza memoria compartida para:
 
 \begin{itemize}
-    \item almacenar resultados parciales;
-    \item realizar reducciones locales;
-    \item minimizar accesos repetidos a memoria global.
+    \item Almacenar resultados parciales.
+    \item Realizar reducciones locales.
+    \item Minimizar accesos repetidos a memoria global.
 \end{itemize}
 
 La utilización de memoria compartida reduce el tráfico de memoria y mejora el rendimiento general del kernel.
@@ -129,37 +133,7 @@ El procedimiento sigue las siguientes etapas:
 
 Esta estrategia evita transferir todos los resultados generados por la GPU y reduce significativamente el volumen de comunicación entre dispositivo y CPU.
 
-\section{Modelo Conceptual}
-
-\begin{figure}[H]
-\centering
-
-\fbox{
-\parbox[c][8cm][c]{0.85\textwidth}{
-
-\centering
-
-GRID
-
-\vspace{0.4cm}
-
-BLOCK 1
-
-BLOCK 2
-
-BLOCK 3
-
-\vspace{0.4cm}
-
-THREADS
-
-}}
-\caption{Jerarquía de ejecución CUDA.}
-\end{figure}
-
 \section{Flujo General}
-
-La Figura anterior resume el esquema general de ejecución.
 
 El procesamiento sigue las siguientes etapas:
 
@@ -176,7 +150,9 @@ El procesamiento sigue las siguientes etapas:
 
 \section{Pseudocódigo}
 
-\begin{lstlisting}[language=Python]
+\begin{lstlisting}[language=Python,
+caption={Pseudocódigo general de la implementación CUDA},
+label={lst:cuda_pseudocode}]
 copiar_datos_gpu()
 
 configurar_grid()
@@ -263,26 +239,26 @@ Sin embargo, al distribuir las evaluaciones entre miles de hilos CUDA, el tiempo
     \item Rendimiento limitado para problemas de tamaño reducido.
 \end{itemize}
 
-\section{Evidencias}
+\section{Evidencia Experimental}
+
+La Figura \ref{fig:benchmark_cuda} presenta los resultados del benchmark obtenido durante los experimentos realizados con la implementación PyCUDA.
 
 \begin{figure}[H]
 \centering
-\fbox{
-\parbox[c][8cm][c]{0.85\textwidth}{
-\centering
-Insertar captura del dispositivo GPU utilizado.
-}}
-\caption{Información del dispositivo CUDA.}
+\includegraphics[width=.95\textwidth, height=0.45\textheight, keepaspectratio]
+{figuras/capturas/benchmark.png}
+\caption{Benchmark de la implementación PyCUDA.}
+\label{fig:benchmark_cuda}
 \end{figure}
 
+La Figura \ref{fig:pycuda_colab} presenta los resultados experimentales obtenidos al ejecutar la implementación sobre Google Colab.
+
 \begin{figure}[H]
 \centering
-\fbox{
-\parbox[c][8cm][c]{0.85\textwidth}{
-\centering
-Insertar captura de ejecución PyCUDA.
-}}
-\caption{Resultados experimentales CUDA.}
+\includegraphics[width=.95\textwidth, height=0.45\textheight, keepaspectratio]
+{figuras/capturas/pycuda_colab.png}
+\caption{Resultados experimentales de la implementación PyCUDA ejecutada en Google Colab.}
+\label{fig:pycuda_colab}
 \end{figure}
 
 \section{Configuración Experimental Recomendada}

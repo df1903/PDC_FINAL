@@ -32,18 +32,18 @@ Durante la ejecución de las pruebas debe registrarse la configuración del ento
 \toprule
 Característica & Especificación \\
 \midrule
-Sistema Operativo & \\
-Procesador & \\
-Núcleos físicos & \\
-Hilos lógicos & \\
-Memoria RAM & \\
-GPU & \\
-Versión Python & \\
-Versión GCC & \\
-Versión OpenMP & \\
-Versión MPI & \\
-Versión CUDA & \\
-Versión PyCUDA & \\
+Sistema Operativo  & Windows 11 (64 bits) \\
+Procesador         & Intel Core i5 \\
+Núcleos físicos     & 4 \\
+Hilos lógicos       & 8 \\
+Memoria RAM         & 8 GB \\
+GPU                 & NVIDIA (Google Colab -- Tesla T4) \\
+Versión Python      & 3.11 \\
+Versión GCC         & 11.4.0 (MinGW-w64 / WSL) \\
+Versión OpenMP      & 4.5 \\
+Versión MPI         & MPICH 4.1 \\
+Versión CUDA        & 12.2 \\
+Versión PyCUDA      & 2024.1 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -51,7 +51,7 @@ Versión PyCUDA & \\
 Los resultados obtenidos deben almacenarse en el archivo:
 
 \begin{center}
-\texttt{results/benchmark.csv}
+\texttt{Resultados/benchmark.csv}
 \end{center}
 
 Este archivo centraliza las métricas de desempeño generadas por las diferentes implementaciones y facilita la construcción de tablas y gráficas comparativas.
@@ -88,16 +88,6 @@ Verificar que la implementación secuencial produzca resultados válidos.
 \textbf{Resultado obtenido}
 
 Completar durante la experimentación.
-
-\begin{figure}[H]
-\centering
-\fbox{
-\parbox[c][8cm][c]{0.85\textwidth}{
-\centering
-Insertar evidencia de ejecución secuencial.
-}}
-\caption{PF-01: Correctitud de la implementación secuencial.}
-\end{figure}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -185,25 +175,27 @@ Las pruebas de desempeño buscan cuantificar el impacto de cada estrategia de pa
 
 Cada experimento debe ejecutarse múltiples veces para reducir la influencia de factores externos como carga del sistema operativo, procesos concurrentes o variaciones en la frecuencia del procesador.
 
-\subsection{Tiempo de ejecución}
+Los experimentos se realizaron utilizando \texttt{k\_candidates = 1{,}000{,}000} y 8 workers para las implementaciones paralelas basadas en CPU (Multicore, OpenMP y MPI), mientras que la implementación CUDA utilizó 1 GPU.
 
-Registrar el tiempo promedio obtenido.
+\subsection{Tiempo de ejecución}
 
 \begin{table}[H]
 \centering
 \caption{Tiempo promedio de ejecución}
 \begin{tabular}{lccc}
 \toprule
-Implementación & Corrida 1 & Corrida 2 & Promedio (s) \\
+Implementación & Corrida 1 (s) & Corrida 2 (s) & Promedio (s) \\
 \midrule
-Secuencial & & & \\
-Multicore & & & \\
-OpenMP & & & \\
-MPI & & & \\
-CUDA & & & \\
+Secuencial & 830.2724 & 801.3928 & \textbf{815.8326} \\
+Multicore  & 173.7440 & 177.7167 & \textbf{175.7304} \\
+OpenMP     & 0.024036 & 0.056817 & \textbf{0.040427} \\
+MPI        & 0.027697 & 0.070864 & \textbf{0.049281} \\
+CUDA       & 0.015747 & 0.039362 & \textbf{0.027555} \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\textit{Nota: Multicore, OpenMP y MPI ejecutados con 8 workers; CUDA ejecutado sobre 1 GPU.}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Speedup}
@@ -224,6 +216,8 @@ donde:
     \item $T_p$ es el tiempo paralelo.
 \end{itemize}
 
+Utilizando $T_{seq} = 815.8326$ s como línea base:
+
 \begin{table}[H]
 \centering
 \caption{Speedup obtenido}
@@ -231,16 +225,27 @@ donde:
 \toprule
 Implementación & Speedup \\
 \midrule
-Multicore & \\
-OpenMP & \\
-MPI & \\
-CUDA & \\
+Multicore & 4.64$\times$ \\
+OpenMP    & 20{,}182$\times$ \\
+MPI       & 16{,}557$\times$ \\
+CUDA      & 29{,}612$\times$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+\textbf{Observaciones clave:}
+
+\begin{itemize}
+    \item Multicore obtiene un speedup de aproximadamente $4.6\times$ frente a Python secuencial utilizando 8 procesos, resultado limitado por el GIL de Python y el overhead asociado a la creación de procesos.
+    \item OpenMP y MPI, al estar implementados en C, alcanzan aceleraciones de entre $16{,}000\times$ y $20{,}000\times$ respecto a la versión secuencial en Python, reflejando tanto la diferencia de lenguaje como el efecto de la paralelización.
+    \item CUDA constituye la implementación más rápida, con un speedup cercano a $29{,}600\times$, aprovechando el paralelismo masivo disponible en la GPU.
+\end{itemize}
+
+\textit{Nota: dado que la línea base corresponde a Python (lenguaje interpretado) mientras que OpenMP, MPI y CUDA están implementados en C/CUDA (lenguajes compilados), el speedup reportado combina el efecto de la paralelización con el efecto del cambio de lenguaje. Por esta razón, los valores de eficiencia y la estimación de la fracción paralelizable mediante la Ley de Amdahl (Secciones \ref{sec:eficiencia} y \ref{sec:amdahl_empirico}) no deben interpretarse en el sentido estrictamente clásico, y se recomienda complementarlas con una comparación adicional entre implementaciones del mismo lenguaje (p. ej. OpenMP vs. MPI) para un análisis de escalabilidad más riguroso.}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Eficiencia}
+\label{sec:eficiencia}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 La eficiencia evalúa qué tan bien son aprovechados los recursos paralelos disponibles.
@@ -262,21 +267,23 @@ donde:
 \caption{Eficiencia obtenida}
 \begin{tabular}{lcc}
 \toprule
-Implementación & Procesadores & Eficiencia \\
+Implementación & Procesadores ($P$) & Eficiencia \\
 \midrule
-Multicore & & \\
-OpenMP & & \\
-MPI & & \\
-CUDA & & \\
+Multicore & 8 & 0.58 \\
+OpenMP    & 8 & 2{,}522.75 \\
+MPI       & 8 & 2{,}069.63 \\
+CUDA      & 1 (GPU) & 29{,}612.00 \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\textit{Nota: los valores de eficiencia superiores a 1 obtenidos para OpenMP, MPI y CUDA son consecuencia de comparar implementaciones en C/CUDA contra una línea base en Python, y no deben interpretarse como eficiencia paralela clásica (la cual está acotada entre 0 y 1). Solo el valor obtenido para Multicore, al compartir el mismo lenguaje que la línea base, es directamente comparable bajo la definición clásica de eficiencia.}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Escalabilidad}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-La escalabilidad mide la capacidad del algoritmo para aprovechar recursos adicionales.
+La escalabilidad mide la capacidad del algoritmo para aprovechar recursos adicionales a medida que se incrementa el número de procesadores.
 
 \begin{table}[H]
 \centering
@@ -285,14 +292,16 @@ La escalabilidad mide la capacidad del algoritmo para aprovechar recursos adicio
 \toprule
 Procesadores & Tiempo (s) & Speedup & Eficiencia \\
 \midrule
-1 & & & \\
-2 & & & \\
-4 & & & \\
-8 & & & \\
-16 & & & \\
+1  & \multicolumn{3}{c}{Sin datos disponibles} \\
+2  & \multicolumn{3}{c}{Sin datos disponibles} \\
+4  & \multicolumn{3}{c}{Sin datos disponibles} \\
+8  & 0.040427 (OpenMP) & 20{,}182$\times$ & 2{,}522.75 \\
+16 & \multicolumn{3}{c}{Sin datos disponibles} \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\textit{Nota: únicamente se dispone de mediciones experimentales para $P=8$. El estudio de escalabilidad completo (variando el número de procesadores entre 1 y 16) queda pendiente de ejecución y debe completarse con corridas adicionales antes de la entrega final.}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Ley de Amdahl}
@@ -324,6 +333,7 @@ En este proyecto, la evaluación independiente de candidatos permite esperar val
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Estimación Empírica de la Fracción Paralelizable}
+\label{sec:amdahl_empirico}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 A partir del speedup experimental observado puede estimarse la fracción paralelizable utilizando:
@@ -343,66 +353,32 @@ Esta estimación permite cuantificar qué porcentaje del algoritmo realmente se 
 \toprule
 Implementación & P & Speedup & f \\
 \midrule
-Multicore & & & \\
-OpenMP & & & \\
-MPI & & & \\
-CUDA & & & \\
+Multicore & 8 & 4.64$\times$  & 0.90 \\
+OpenMP    & 8 & 20{,}182$\times$ & N/D$^{*}$ \\
+MPI       & 8 & 16{,}557$\times$ & N/D$^{*}$ \\
+CUDA      & 1 & 29{,}612$\times$ & N/D$^{*}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Valores cercanos a uno indican que la mayor parte del algoritmo puede ejecutarse en paralelo, mientras que valores menores evidencian la presencia de componentes secuenciales significativos.
+\textit{$^{*}$N/D: la fórmula arroja valores de $f$ superiores a 1 (matemáticamente inconsistentes con el modelo de Amdahl) debido a que el speedup involucrado mezcla el efecto de la paralelización con el cambio de lenguaje (Python a C/CUDA). Para CUDA, adicionalmente, $P=1$ genera una división por cero en el denominador. Una estimación válida de $f$ requeriría comparar cada implementación contra una línea base secuencial escrita en el mismo lenguaje.}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Gráficas Experimentales}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-Las siguientes figuras deberán completarse una vez obtenidos los resultados experimentales.
-
-\begin{figure}[H]
-\centering
-\fbox{
-\parbox[c][7cm][c]{0.85\textwidth}{
-\centering
-Insertar gráfica Tiempo vs Implementación.
-}}
-\caption{Comparación de tiempos de ejecución.}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\fbox{
-\parbox[c][7cm][c]{0.85\textwidth}{
-\centering
-Insertar gráfica de Speedup.
-}}
-\caption{Speedup de las implementaciones paralelas.}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\fbox{
-\parbox[c][7cm][c]{0.85\textwidth}{
-\centering
-Insertar gráfica de eficiencia.
-}}
-\caption{Eficiencia obtenida.}
-\end{figure}
+Únicamente el valor obtenido para Multicore resulta consistente con el modelo teórico, indicando que aproximadamente el 90\% del algoritmo es paralelizable bajo esa comparación.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Análisis de Resultados}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-Una vez diligenciadas las tablas anteriores, deberá realizarse un análisis crítico considerando:
+A partir de las tablas anteriores se identifican los siguientes hallazgos:
 
 \begin{itemize}
-    \item Diferencias observadas entre las implementaciones.
-    \item Impacto del overhead de comunicación.
-    \item Comportamiento de OpenMP frente a MPI.
-    \item Beneficios obtenidos mediante GPU.
-    \item Relación entre speedup observado y speedup teórico.
-    \item Estimación empírica de la fracción paralelizable.
-    \item Limitaciones identificadas durante la experimentación.
+    \item Todas las implementaciones paralelas superan ampliamente a la versión secuencial en tiempo de ejecución, sin comprometer la calidad de la solución encontrada.
+    \item El overhead de comunicación afecta de forma más notoria a Multicore, dado que la creación de procesos y la serialización de datos representan un costo significativo frente al tiempo total de cómputo.
+    \item OpenMP presenta un desempeño levemente superior a MPI en el entorno de un solo nodo evaluado, consistente con su menor overhead de sincronización frente al paso de mensajes.
+    \item CUDA ofrece el mayor beneficio absoluto gracias al paralelismo masivo de la GPU, aunque su ventaja relativa frente a OpenMP y MPI es moderada una vez que ambos se ejecutan en C.
+    \item La comparación de speedup y eficiencia entre implementaciones de distinto lenguaje (Python vs. C/CUDA) debe interpretarse con cautela, ya que combina el efecto de la paralelización con el del cambio de lenguaje.
+    \item La estimación empírica de la fracción paralelizable solo resultó matemáticamente consistente para Multicore, evidenciando la necesidad de una línea base secuencial en C para evaluar correctamente OpenMP, MPI y CUDA bajo la Ley de Amdahl.
+    \item Como limitación principal se identifica la ausencia de un estudio de escalabilidad con múltiples valores de $P$ (1, 2, 4, 8, 16), pendiente de ejecución experimental.
 \end{itemize}
 
 Los hallazgos obtenidos servirán como fundamento para la interpretación de resultados experimentales y las conclusiones finales del proyecto.

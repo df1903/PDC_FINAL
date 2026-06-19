@@ -1,10 +1,12 @@
 \documentclass[12pt,letterpaper,oneside]{report}
 
+% ── Idioma y codificación ──────────────────────────────
 \usepackage[spanish,es-nodecimaldot]{babel}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
+\usepackage{lmodern}
 
-
+% ── Márgenes ──────────────────────────────────────────
 \usepackage{geometry}
 \geometry{
     left=3cm,
@@ -13,10 +15,10 @@
     bottom=2.5cm
 }
 
-
+% ── Matemáticas ───────────────────────────────────────
 \usepackage{amsmath,amssymb,amsfonts}
 
-
+% ── Figuras y tablas ──────────────────────────────────
 \usepackage{graphicx}
 \usepackage{float}
 \usepackage{caption}
@@ -25,9 +27,9 @@
 \usepackage{multirow}
 \usepackage{longtable}
 
-
-\usepackage{listings}
+% ── Código fuente ─────────────────────────────────────
 \usepackage{xcolor}
+\usepackage{listings}
 
 \definecolor{codegray}{RGB}{245,245,245}
 \definecolor{commentgreen}{RGB}{0,120,0}
@@ -45,18 +47,7 @@
     tabsize=4
 }
 
-
-\usepackage[hidelinks]{hyperref}
-
-
-\usepackage[
-backend=biber,
-style=ieee
-]{biblatex}
-
-\addbibresource{referencias.bib}
-
-
+% ── Formato de capítulos ──────────────────────────────
 \usepackage{titlesec}
 
 \titleformat{\chapter}[display]
@@ -65,7 +56,18 @@ style=ieee
 {20pt}
 {\Huge}
 
+% ── Bibliografía ──────────────────────────────────────
+\usepackage[
+    backend=biber,
+    style=ieee
+]{biblatex}
 
+\addbibresource{referencias.bib}
+
+% ── Hyperref (siempre al final) ───────────────────────
+\usepackage[hidelinks]{hyperref}
+
+% ══════════════════════════════════════════════════════
 \begin{document}
 
 \input{portada}
@@ -95,9 +97,8 @@ style=ieee
 \input{capitulos/14_limitaciones}
 \input{capitulos/15_trabajo_futuro}
 \input{capitulos/16_conclusiones}
-\input{capitulos/anexos}
 
-
+\nocite{*}
 \printbibliography
 
 \end{document}

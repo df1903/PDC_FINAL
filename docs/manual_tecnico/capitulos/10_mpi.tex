@@ -39,34 +39,9 @@ Cada trabajador:
 
 \begin{figure}[H]
 \centering
-
-\fbox{
-\parbox[c][8cm][c]{0.85\textwidth}{
-
-\centering
-
-Master
-
-\vspace{0.5cm}
-
-$\downarrow$
-
-\vspace{0.5cm}
-
-Worker 1 \hspace{0.3cm}
-Worker 2 \hspace{0.3cm}
-Worker 3
-
-\vspace{0.3cm}
-
-$\vdots$
-
-\vspace{0.3cm}
-
-Worker N
-
-}}
+\includegraphics[width=0.85\textwidth]{figuras/implementaciones/01_mpi.png}
 \caption{Arquitectura maestro--trabajadores mediante MPI.}
+\label{fig:mpi_master_worker}
 \end{figure}
 
 \section{Flujo de Ejecución}
@@ -83,7 +58,9 @@ Worker N
 
 \section{Pseudocódigo}
 
-\begin{lstlisting}[language=C]
+\begin{lstlisting}[language=C,
+caption={Pseudocódigo general de la implementación MPI},
+label={lst:mpi_pseudocode}]
 MPI_Init();
 
 if(rank == MASTER)
@@ -121,32 +98,23 @@ MPI_Finalize();
 
 \begin{figure}[H]
 \centering
-\fbox{
-\parbox[c][8cm][c]{0.85\textwidth}{
-\centering
-Insertar captura de compilación MPI.
-}}
-\caption{Compilación utilizando MPI.}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\fbox{
-\parbox[c][8cm][c]{0.85\textwidth}{
-\centering
-Insertar captura de ejecución MPI.
-}}
-\caption{Resultados experimentales MPI.}
+\includegraphics[width=0.90\textwidth]{figuras/capturas/mpi.png}
+\caption{Resultados experimentales obtenidos mediante la implementación MPI.}
+\label{fig:mpi_execution}
 \end{figure}
 
 \section{Compilación}
 
-\begin{lstlisting}[language=bash]
+\begin{lstlisting}[language=bash,
+caption={Compilación de la implementación MPI},
+label={lst:mpi_compile}]
 mpicc scoring_mpi.c -o scoring_mpi
 \end{lstlisting}
 
 \section{Ejecución}
 
-\begin{lstlisting}[language=bash]
+\begin{lstlisting}[language=bash,
+caption={Ejecución utilizando cuatro procesos MPI},
+label={lst:mpi_run}]
 mpirun -np 4 ./scoring_mpi
 \end{lstlisting}
